@@ -12,20 +12,15 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// API route to get data from Database. If empty, seed from Google Sheet.
-app.get('/api/organismos', async (req, res) => {
+async function seedDatabaseIfEmpty() {
   try {
     const existing = await db.select().from(organismos);
     if (existing.length > 0) {
-      // Cast numeric to number since PG might return some int as strings
-      const formatted = existing.map(org => ({
-        ...org,
-        qTramitesGuia: Number(org.qTramitesGuia)
-      }));
-      return res.json(formatted);
+      console.log(`Database already has ${existing.length} organismos. Skipping seeding.`);
+      return;
     }
 
-    // Seed logic
+    console.log("Database is empty. Seeding from Google Sheets...");
     const DATA_URL = "https://docs.google.com/spreadsheets/d/1nbgHe7U_A6l25EJTgJz6ERtnE8XmyVV3/gviz/tq?tqx=out:json&gid=67432853";
     const response = await fetch(DATA_URL);
     if (!response.ok) {
@@ -36,7 +31,7 @@ app.get('/api/organismos', async (req, res) => {
     // Extract the JSON payload within google.visualization.Query.setResponse()
     const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/);
     if (!match) {
-      return res.status(500).json({ error: "Invalid response format from Google Sheets" });
+      throw new Error("Invalid response format from Google Sheets");
     }
     
     const parsed = JSON.parse(match[1]);
@@ -116,12 +111,23 @@ app.get('/api/organismos', async (req, res) => {
       };
     });
 
-    const inserted = await db.insert(organismos).values(parsedData).returning();
-    const insertedFormatted = inserted.map(org => ({
+    await db.insert(organismos).values(parsedData);
+    console.log("Database seeded successfully!");
+  } catch (err: any) {
+    console.error("Failed to seed database on startup:", err);
+  }
+}
+
+// API route to get data from Database.
+app.get('/api/organismos', async (req, res) => {
+  try {
+    const existing = await db.select().from(organismos);
+    // Cast numeric to number since PG might return some int as strings
+    const formatted = existing.map(org => ({
       ...org,
       qTramitesGuia: Number(org.qTramitesGuia)
     }));
-    res.json(insertedFormatted);
+    return res.json(formatted);
   } catch (err: any) {
     console.error("Backend failed:", err);
     res.status(500).json({ error: err.message || "Failed to load database" });
@@ -139,15 +145,42 @@ app.put('/api/organismos/:id', requireAuth, async (req: AuthRequest, res) => {
   }
 
   try {
-    const updated = await db.update(organismos)
-      .set({
-        ...data,
-        updatedAt: new Date()
-      })
+    // Sanitize data - extract only valid, updatable columns
+    const allowedKeys = [
+      'nombre', 'tipo', 'tieneWeb', 'enlaceWeb', 'enlaceWebGov',
+      'tieneWebPropia', 'enlaceWebPropia', 'guiaTramites', 'enlaceGuia',
+      'qTramitesGuia', 'tramitesOnline', 'enlaceTramitesOnline', 'qTramitesOnline',
+      'iniciarTramOnline', 'enlaceIniciarTramOnline', 'qIniciarTramOnline',
+      'expedienteDigital', 'usaIA', 'chatbot', 'turnosOnline',
+      'seguimientoTramites', 'atencionDigital', 'capacitacion', 'capacitacionDigital',
+      'fuente', 'nivelConfianza', 'completitud'
+    ];
+
+    const updateFields: any = {};
+    for (const key of allowedKeys) {
+      if (data[key] !== undefined) {
+        updateFields[key] = data[key];
+      }
+    }
+
+    // Convert qTramitesGuia to number to prevent SQLite/Drizzle schema errors
+    if (updateFields.qTramitesGuia !== undefined) {
+      updateFields.qTramitesGuia = Number(updateFields.qTramitesGuia) || 0;
+    }
+
+    console.log("Updating organism ID:", id, "Fields:", updateFields);
+
+    // Always update updatedAt timestamp
+    updateFields.updatedAt = new Date();
+
+    const updatedResult = await db.update(organismos)
+      .set(updateFields)
       .where(eq(organismos.id, Number(id)))
       .returning();
 
-    if (updated.length === 0) {
+    console.log("Updated result:", JSON.stringify(updatedResult[0]));
+
+    if (updatedResult.length === 0) {
       return res.status(404).json({ error: "Organismo not found" });
     }
 
@@ -183,6 +216,9 @@ app.get('/api/organismos/:id/history', requireAuth, async (req: AuthRequest, res
 
 // Configure Vite middleware in development or serve static build files in production
 async function startServer() {
+  // Ensure database is seeded on start
+  await seedDatabaseIfEmpty();
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

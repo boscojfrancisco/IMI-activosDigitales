@@ -6,22 +6,43 @@ export const organismos = sqliteTable('organismos', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   nombre: text('nombre').notNull(),
   tipo: text('tipo').notNull().default('Desconocido'),
+  
+  // Website
   tieneWeb: integer('tiene_web', { mode: 'boolean' }).default(false),
   enlaceWeb: text('enlace_web'),
   enlaceWebGov: text('enlace_web_gov'),
   tieneWebPropia: integer('tiene_web_propia', { mode: 'boolean' }).default(false),
   enlaceWebPropia: text('enlace_web_propia'),
+
+  // Tramites
   guiaTramites: text('guia_tramites').default('No'),
   enlaceGuia: text('enlace_guia'),
   qTramitesGuia: integer('q_tramites_guia').default(0),
+  
   tramitesOnline: text('tramites_online').default('No'),
   enlaceTramitesOnline: text('enlace_tramites_online'),
+  qTramitesOnline: integer('q_tramites_online').default(0),
+
+  iniciarTramOnline: text('iniciar_tram_online').default('No'),
+  enlaceIniciarTramOnline: text('enlace_iniciar_tram_online'),
+  qIniciarTramOnline: integer('q_iniciar_tram_online').default(0),
+
+  // Digital
   expedienteDigital: text('expediente_digital').default('No'),
+  turnosOnline: text('turnos_online').default('No'),
+  atencionDigital: text('atencion_digital').default('No'),
+  seguimientoTramites: text('seguimiento_tramites').default('No'),
+
+  // Extra
+  capacitacion: text('capacitacion').default('No'),
+  capacitacionDigital: text('capacitacion_digital').default('No'),
   usaIA: integer('usa_ia', { mode: 'boolean' }).default(false),
   chatbot: integer('chatbot', { mode: 'boolean' }).default(false),
-  turnosOnline: text('turnos_online').default('No'),
-  seguimientoTramites: text('seguimiento_tramites').default('No'),
-  atencionDigital: text('atencion_digital').default('No'),
+  
+  fuente: text('fuente'),
+  nivelConfianza: text('nivel_confianza').default('Bajo'),
+  completitud: text('completitud').default('Baja'),
+
   createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`),
 });

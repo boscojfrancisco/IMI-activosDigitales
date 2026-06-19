@@ -1,4 +1,5 @@
 export interface Organismo {
+  id: number;
   nombre: string;
   tipo: string;
   tieneWeb: boolean;
@@ -6,18 +7,34 @@ export interface Organismo {
   enlaceWebGov: string;
   tieneWebPropia: boolean;
   enlaceWebPropia: string;
-  dateActualizacion: string;
-  guiaTramites: 'Tiene' | 'No' | string;
+  
+  guiaTramites: string;
   enlaceGuia: string;
   qTramitesGuia: number;
-  tramitesOnline: 'Tiene' | 'No' | string;
+  
+  tramitesOnline: string;
   enlaceTramitesOnline: string;
-  expedienteDigital: 'Tiene' | 'No' | string;
+  qTramitesOnline: number;
+
+  iniciarTramOnline: string;
+  enlaceIniciarTramOnline: string;
+  qIniciarTramOnline: number;
+
+  expedienteDigital: string;
+  turnosOnline: string;
+  atencionDigital: string;
+  seguimientoTramites: string;
+  
+  capacitacion: string;
+  capacitacionDigital: string;
   usaIA: boolean;
   chatbot: boolean;
-  turnosOnline: 'Tiene' | 'No' | string;
-  seguimientoTramites: 'Tiene' | 'No' | string;
-  atencionDigital: 'Tiene' | 'No' | string;
+  
+  fuente: string;
+  nivelConfianza: string;
+  completitud: string;
+  
+  dateActualizacion?: string; // Kept for backward compatibility
 }
 
 export interface Stats {

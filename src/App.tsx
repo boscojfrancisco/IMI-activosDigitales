@@ -453,7 +453,7 @@ export default function App() {
             organismo={editingOrg}
             onClose={() => setEditingOrg(null)}
             onSaved={(updated) => {
-              setData(prev => prev.map(o => o.id === updated.id ? updated : o));
+              setOrganismos(prev => prev.map(o => o.id === updated.id ? updated : o));
               setEditingOrg(null);
             }}
           />
