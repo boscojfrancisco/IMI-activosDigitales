@@ -1,0 +1,205 @@
+import express from 'express';
+import path from 'path';
+import { createServer as createViteServer } from 'vite';
+
+import { db } from './src/db/index.ts';
+import { organismos, indicadoresHistory } from './src/db/schema.ts';
+import { eq } from 'drizzle-orm';
+import { requireAuth, AuthRequest } from './src/middleware/auth.ts';
+
+const app = express();
+const PORT = 3000;
+
+app.use(express.json());
+
+// API route to get data from Database. If empty, seed from Google Sheet.
+app.get('/api/organismos', async (req, res) => {
+  try {
+    const existing = await db.select().from(organismos);
+    if (existing.length > 0) {
+      // Cast numeric to number since PG might return some int as strings
+      const formatted = existing.map(org => ({
+        ...org,
+        qTramitesGuia: Number(org.qTramitesGuia)
+      }));
+      return res.json(formatted);
+    }
+
+    // Seed logic
+    const DATA_URL = "https://docs.google.com/spreadsheets/d/1nbgHe7U_A6l25EJTgJz6ERtnE8XmyVV3/gviz/tq?tqx=out:json&gid=67432853";
+    const response = await fetch(DATA_URL);
+    if (!response.ok) {
+      throw new Error(`HTTP error fetching spreadsheet: ${response.status}`);
+    }
+    const text = await response.text();
+    
+    // Extract the JSON payload within google.visualization.Query.setResponse()
+    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/);
+    if (!match) {
+      return res.status(500).json({ error: "Invalid response format from Google Sheets" });
+    }
+    
+    const parsed = JSON.parse(match[1]);
+    const table = parsed.table;
+    
+    const validRows = table.rows.filter((r: any) => {
+      if (!r || !Array.isArray(r.c)) return false;
+      const orgCell = r.c[0];
+      return orgCell && orgCell.v && orgCell.v.toString().trim() !== '';
+    });
+
+    const parsedData = validRows.map((r: any) => {
+      const c = r.c || [];
+      const getVal = (idx: number, preferFormatted = false) => {
+        const cell = c[idx];
+        if (!cell) return '';
+        if (preferFormatted && cell.f) return cell.f.toString();
+        return (cell.v !== null && cell.v !== undefined) ? cell.v.toString() : '';
+      };
+
+      const nombre = getVal(0).trim();
+      const tipo = getVal(1).trim() || 'Desconocido';
+      const tieneWebStr = getVal(2).trim().toLowerCase();
+      
+      const websitePropia = getVal(4).trim();
+      const websiteGov = getVal(3).trim();
+      let enlaceWeb = '';
+      if (websitePropia && websitePropia !== 'null' && websitePropia !== '') {
+        enlaceWeb = websitePropia;
+      } else if (websiteGov && websiteGov !== 'null' && websiteGov !== '') {
+        enlaceWeb = websiteGov;
+      }
+
+      const tieneWebPropia = websitePropia && websitePropia !== 'null' && websitePropia.trim() !== '';
+      const enlaceWebPropia = tieneWebPropia ? websitePropia : '';
+      const enlaceWebGov = websiteGov && websiteGov !== 'null' ? websiteGov : '';
+
+      const guiaTramites = getVal(7).trim();
+      const enlaceGuia = getVal(8).trim();
+
+      const qTramitesRaw = getVal(9).trim();
+      const qTramitesVal = parseInt(qTramitesRaw.replace(/\D/g, ''), 10);
+
+      const tramitesOnline = getVal(10).trim();
+      let enlaceTramitesOnline = getVal(11).trim();
+      if (!enlaceTramitesOnline || enlaceTramitesOnline === 'null') {
+        enlaceTramitesOnline = getVal(14).trim();
+      }
+
+      const expedienteDigital = getVal(16).trim();
+      const turnosOnline = getVal(17).trim();
+      const atencionDigital = getVal(18).trim();
+      const seguimientoTramites = getVal(19).trim();
+
+      const usaIAStr = getVal(22).trim().toLowerCase();
+      const chatbotStr = getVal(23).trim().toLowerCase();
+
+      return {
+        nombre,
+        tipo,
+        tieneWeb: tieneWebStr === 'si' || tieneWebStr === 'sí',
+        enlaceWeb,
+        enlaceWebGov,
+        tieneWebPropia,
+        enlaceWebPropia,
+        guiaTramites: guiaTramites || 'No',
+        enlaceGuia: enlaceGuia && enlaceGuia !== 'null' ? enlaceGuia : '',
+        qTramitesGuia: isNaN(qTramitesVal) ? 0 : qTramitesVal,
+        tramitesOnline: tramitesOnline || 'No',
+        enlaceTramitesOnline: enlaceTramitesOnline && enlaceTramitesOnline !== 'null' ? enlaceTramitesOnline : '',
+        expedienteDigital: expedienteDigital || 'No',
+        usaIA: usaIAStr === 'si' || usaIAStr === 'sí',
+        chatbot: chatbotStr === 'si' || chatbotStr === 'sí',
+        turnosOnline: turnosOnline || 'No',
+        seguimientoTramites: seguimientoTramites || 'No',
+        atencionDigital: atencionDigital || 'No',
+      };
+    });
+
+    const inserted = await db.insert(organismos).values(parsedData).returning();
+    const insertedFormatted = inserted.map(org => ({
+      ...org,
+      qTramitesGuia: Number(org.qTramitesGuia)
+    }));
+    res.json(insertedFormatted);
+  } catch (err: any) {
+    console.error("Backend failed:", err);
+    res.status(500).json({ error: err.message || "Failed to load database" });
+  }
+});
+
+// Update Organismo
+app.put('/api/organismos/:id', requireAuth, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const data = req.body;
+  const uid = req.user?.uid;
+
+  if (!uid) {
+    return res.status(401).json({ error: "No user uid" });
+  }
+
+  try {
+    const updated = await db.update(organismos)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(organismos.id, Number(id)))
+      .returning();
+
+    if (updated.length === 0) {
+      return res.status(404).json({ error: "Organismo not found" });
+    }
+
+    // Save history
+    await db.insert(indicadoresHistory).values({
+      organismoId: Number(id),
+      userId: uid,
+      snapshot: JSON.stringify(updated[0])
+    });
+
+    const formatted = {
+      ...updated[0],
+      qTramitesGuia: Number(updated[0].qTramitesGuia)
+    };
+    res.json(formatted);
+  } catch (error: any) {
+    console.error("Update failed:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/organismos/:id/history', requireAuth, async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  try {
+    const history = await db.select()
+      .from(indicadoresHistory)
+      .where(eq(indicadoresHistory.organismoId, Number(id)));
+    res.json(history);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Configure Vite middleware in development or serve static build files in production
+async function startServer() {
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();

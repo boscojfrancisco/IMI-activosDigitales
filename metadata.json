@@ -1,0 +1,6 @@
+{
+  "name": "Monitor de Digitalización",
+  "description": "Monitor del estado de digitalización de la administración pública de Corrientes",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
