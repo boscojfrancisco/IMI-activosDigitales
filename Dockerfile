@@ -1,5 +1,5 @@
 # ── Stage 1: Build ──
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: Runtime ──
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN apk add --no-cache python3 make g++
 
 # Copiar package files e instalar solo dependencias de producción
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-engines
 
 # Copiar el build compilado desde la stage anterior
 COPY --from=builder /app/dist ./dist
