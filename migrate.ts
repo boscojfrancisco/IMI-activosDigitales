@@ -12,7 +12,8 @@ async function migrate() {
       'capacitacion_digital TEXT DEFAULT "No"',
       'fuente TEXT',
       'nivel_confianza TEXT DEFAULT "Bajo"',
-      'completitud TEXT DEFAULT "Baja"'
+      'completitud TEXT DEFAULT "Baja"',
+      'enlace_turnos_online TEXT'
     ];
 
     for (const col of columns) {

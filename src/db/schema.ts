@@ -30,6 +30,7 @@ export const organismos = sqliteTable('organismos', {
   // Digital
   expedienteDigital: text('expediente_digital').default('No'),
   turnosOnline: text('turnos_online').default('No'),
+  enlaceTurnosOnline: text('enlace_turnos_online'),
   atencionDigital: text('atencion_digital').default('No'),
   seguimientoTramites: text('seguimiento_tramites').default('No'),
 
@@ -38,6 +39,12 @@ export const organismos = sqliteTable('organismos', {
   capacitacionDigital: text('capacitacion_digital').default('No'),
   usaIA: integer('usa_ia', { mode: 'boolean' }).default(false),
   chatbot: integer('chatbot', { mode: 'boolean' }).default(false),
+  
+  // Nuevas Variables Solicitadas
+  firmaDigital: text('firma_digital').default('No'),
+  analisisProcesos: text('analisis_procesos').default('No'),
+  tieneDoco: text('tiene_doco').default('No'),
+  usaSiif: text('usa_siif').default('No'),
   
   fuente: text('fuente'),
   nivelConfianza: text('nivel_confianza').default('Bajo'),

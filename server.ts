@@ -8,15 +8,29 @@ import { eq } from 'drizzle-orm';
 import { requireAuth, AuthRequest } from './src/middleware/auth.ts';
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(express.json());
 
 async function seedDatabaseIfEmpty() {
   try {
     const existing = await db.select().from(organismos);
+    
+    // Si ya hay organismos, verificar si el historial está vacío para sembrar la línea base
     if (existing.length > 0) {
-      console.log(`Database already has ${existing.length} organismos. Skipping seeding.`);
+      console.log(`Database already has ${existing.length} organismos. Checking history baseline...`);
+      const existingHistory = await db.select().from(indicadoresHistory);
+      if (existingHistory.length === 0) {
+        console.log("No history found. Creating initial baseline history for existing records...");
+        for (const org of existing) {
+          await db.insert(indicadoresHistory).values({
+            organismoId: org.id,
+            userId: 'Línea Base Inicial',
+            snapshot: JSON.stringify(org)
+          });
+        }
+        console.log("Initial baseline history generated successfully.");
+      }
       return;
     }
 
@@ -103,6 +117,10 @@ async function seedDatabaseIfEmpty() {
         tramitesOnline: tramitesOnline || 'No',
         enlaceTramitesOnline: enlaceTramitesOnline && enlaceTramitesOnline !== 'null' ? enlaceTramitesOnline : '',
         expedienteDigital: expedienteDigital || 'No',
+        firmaDigital: 'No',
+        analisisProcesos: 'No',
+        tieneDoco: 'No',
+        usaSiif: 'No',
         usaIA: usaIAStr === 'si' || usaIAStr === 'sí',
         chatbot: chatbotStr === 'si' || chatbotStr === 'sí',
         turnosOnline: turnosOnline || 'No',
@@ -112,7 +130,17 @@ async function seedDatabaseIfEmpty() {
     });
 
     await db.insert(organismos).values(parsedData);
-    console.log("Database seeded successfully!");
+    
+    // Sembrar también el historial inicial
+    const inserted = await db.select().from(organismos);
+    for (const org of inserted) {
+      await db.insert(indicadoresHistory).values({
+        organismoId: org.id,
+        userId: 'Línea Base Inicial',
+        snapshot: JSON.stringify(org)
+      });
+    }
+    console.log("Database and baseline history seeded successfully!");
   } catch (err: any) {
     console.error("Failed to seed database on startup:", err);
   }
@@ -134,15 +162,10 @@ app.get('/api/organismos', async (req, res) => {
   }
 });
 
-// Update Organismo
-app.put('/api/organismos/:id', requireAuth, async (req: AuthRequest, res) => {
+// Update Organismo (sin autenticación para uso local)
+app.put('/api/organismos/:id', async (req, res) => {
   const { id } = req.params;
   const data = req.body;
-  const uid = req.user?.uid;
-
-  if (!uid) {
-    return res.status(401).json({ error: "No user uid" });
-  }
 
   try {
     // Sanitize data - extract only valid, updatable columns
@@ -151,9 +174,10 @@ app.put('/api/organismos/:id', requireAuth, async (req: AuthRequest, res) => {
       'tieneWebPropia', 'enlaceWebPropia', 'guiaTramites', 'enlaceGuia',
       'qTramitesGuia', 'tramitesOnline', 'enlaceTramitesOnline', 'qTramitesOnline',
       'iniciarTramOnline', 'enlaceIniciarTramOnline', 'qIniciarTramOnline',
-      'expedienteDigital', 'usaIA', 'chatbot', 'turnosOnline',
+      'expedienteDigital', 'usaIA', 'chatbot', 'turnosOnline', 'enlaceTurnosOnline',
       'seguimientoTramites', 'atencionDigital', 'capacitacion', 'capacitacionDigital',
-      'fuente', 'nivelConfianza', 'completitud'
+      'fuente', 'nivelConfianza', 'completitud',
+      'firmaDigital', 'analisisProcesos', 'tieneDoco', 'usaSiif'
     ];
 
     const updateFields: any = {};
@@ -184,16 +208,21 @@ app.put('/api/organismos/:id', requireAuth, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Organismo not found" });
     }
 
-    // Save history
-    await db.insert(indicadoresHistory).values({
-      organismoId: Number(id),
-      userId: uid,
-      snapshot: JSON.stringify(updated[0])
-    });
+    // Registrar en el historial de cambios de forma local
+    try {
+      await db.insert(indicadoresHistory).values({
+        organismoId: Number(id),
+        userId: 'Usuario Local',
+        snapshot: JSON.stringify(updatedResult[0])
+      });
+      console.log("History log saved for organism:", id);
+    } catch (e) {
+      console.error("Failed to write to history log:", e);
+    }
 
     const formatted = {
-      ...updated[0],
-      qTramitesGuia: Number(updated[0].qTramitesGuia)
+      ...updatedResult[0],
+      qTramitesGuia: Number(updatedResult[0].qTramitesGuia)
     };
     res.json(formatted);
   } catch (error: any) {
@@ -202,17 +231,57 @@ app.put('/api/organismos/:id', requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
-app.get('/api/organismos/:id/history', requireAuth, async (req: AuthRequest, res) => {
+// GET History of a single organism
+app.get('/api/organismos/:id/history', async (req, res) => {
   const { id } = req.params;
   try {
     const history = await db.select()
       .from(indicadoresHistory)
       .where(eq(indicadoresHistory.organismoId, Number(id)));
+    
+    // Sort in memory to avoid needing desc import if preferred, but we will sort it desc by date
+    history.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
     res.json(history);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// GET general history across all organisms
+app.get('/api/history', async (req, res) => {
+  try {
+    const history = await db.select().from(indicadoresHistory);
+    const allOrgs = await db.select().from(organismos);
+
+    // Map organism names for fast lookup
+    const orgsMap = allOrgs.reduce((acc: any, o) => {
+      acc[o.id] = o.nombre;
+      return acc;
+    }, {});
+
+    const enriched = history.map(item => ({
+      ...item,
+      organismoNombre: orgsMap[item.organismoId] || 'Desconocido'
+    }));
+
+    // Sort descending by date
+    enriched.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    res.json(enriched);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // Configure Vite middleware in development or serve static build files in production
 async function startServer() {

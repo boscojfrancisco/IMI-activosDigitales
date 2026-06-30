@@ -7,6 +7,7 @@ import OrganismoCard, { getMaturityGrade } from './components/OrganismoCard';
 import MatrixTable from './components/MatrixTable';
 import DigitalMaturityChart from './components/DigitalMaturityChart';
 import OrganismoEditModal from './components/OrganismoEditModal';
+import GeneralHistory from './components/GeneralHistory';
 import { AnimatePresence, motion } from 'motion/react';
 import { 
   Building2, 
@@ -32,7 +33,11 @@ const INITIAL_FILTERS: FilterState = {
   tramitesOnline: false,
   turnosOnline: false,
   expedienteDigital: false,
-  usaIAOrChatbot: false
+  usaIAOrChatbot: false,
+  firmaDigital: false,
+  analisisProcesos: false,
+  tieneDoco: false,
+  usaSiif: false
 };
 
 export default function App() {
@@ -42,7 +47,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   
   // UI views and themes
-  const [activeTab, setActiveTab] = useState<'cards' | 'matrix' | 'charts'>('cards');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history'>('matrix');
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [sortBy, setSortBy] = useState<string>('nombre_asc');
   const [editingOrg, setEditingOrg] = useState<Organismo | null>(null);
@@ -135,16 +140,24 @@ export default function App() {
     let conExpedienteDigital = 0;
     let conChatbotOrIA = 0;
     let conSeguimiento = 0;
+    let conFirmaDigital = 0;
+    let conAnalisisProcesos = 0;
+    let conDoco = 0;
+    let conSiif = 0;
 
     baseFilteredList.forEach(org => {
       if (org.tieneWeb) conWeb++;
       if (org.tieneWebPropia) conWebPropia++;
-      if (org.guiaTramites?.toLowerCase().trim() === 'tiene') conGuia++;
-      if (org.tramitesOnline?.toLowerCase().trim() === 'tiene') conTramitesOnline++;
-      if (org.turnosOnline?.toLowerCase().trim() === 'tiene') conTurnosOnline++;
-      if (org.expedienteDigital?.toLowerCase().trim() === 'tiene') conExpedienteDigital++;
+      if (org.guiaTramites?.toLowerCase().trim() === 'tiene' || org.guiaTramites?.toLowerCase().trim() === 'si' || org.guiaTramites?.toLowerCase().trim() === 'sí') conGuia++;
+      if (org.tramitesOnline?.toLowerCase().trim() === 'tiene' || org.tramitesOnline?.toLowerCase().trim() === 'si' || org.tramitesOnline?.toLowerCase().trim() === 'sí') conTramitesOnline++;
+      if (org.turnosOnline?.toLowerCase().trim() === 'tiene' || org.turnosOnline?.toLowerCase().trim() === 'si' || org.turnosOnline?.toLowerCase().trim() === 'sí') conTurnosOnline++;
+      if (org.expedienteDigital?.toLowerCase().trim() === 'tiene' || org.expedienteDigital?.toLowerCase().trim() === 'si' || org.expedienteDigital?.toLowerCase().trim() === 'sí') conExpedienteDigital++;
       if (org.chatbot || org.usaIA) conChatbotOrIA++;
-      if (org.seguimientoTramites?.toLowerCase().trim() === 'tiene') conSeguimiento++;
+      if (org.seguimientoTramites?.toLowerCase().trim() === 'tiene' || org.seguimientoTramites?.toLowerCase().trim() === 'si' || org.seguimientoTramites?.toLowerCase().trim() === 'sí') conSeguimiento++;
+      if (org.firmaDigital?.toLowerCase().trim() === 'tiene' || org.firmaDigital?.toLowerCase().trim() === 'si' || org.firmaDigital?.toLowerCase().trim() === 'sí') conFirmaDigital++;
+      if (org.analisisProcesos?.toLowerCase().trim() === 'tiene' || org.analisisProcesos?.toLowerCase().trim() === 'hizo' || org.analisisProcesos?.toLowerCase().trim() === 'si' || org.analisisProcesos?.toLowerCase().trim() === 'sí') conAnalisisProcesos++;
+      if (org.tieneDoco?.toLowerCase().trim() === 'tiene' || org.tieneDoco?.toLowerCase().trim() === 'si' || org.tieneDoco?.toLowerCase().trim() === 'sí') conDoco++;
+      if (org.usaSiif?.toLowerCase().trim() === 'tiene' || org.usaSiif?.toLowerCase().trim() === 'si' || org.usaSiif?.toLowerCase().trim() === 'sí') conSiif++;
     });
 
     return {
@@ -156,7 +169,11 @@ export default function App() {
       conTurnosOnline,
       conExpedienteDigital,
       conChatbotOrIA,
-      conSeguimiento
+      conSeguimiento,
+      conFirmaDigital,
+      conAnalisisProcesos,
+      conDoco,
+      conSiif
     };
   }, [baseFilteredList]);
 
@@ -172,19 +189,31 @@ export default function App() {
       result = result.filter(org => org.tieneWebPropia);
     }
     if (filters.guiaTramites) {
-      result = result.filter(org => org.guiaTramites?.toLowerCase().trim() === 'tiene');
+      result = result.filter(org => org.guiaTramites?.toLowerCase().trim() === 'tiene' || org.guiaTramites?.toLowerCase().trim() === 'si' || org.guiaTramites?.toLowerCase().trim() === 'sí');
     }
     if (filters.tramitesOnline) {
-      result = result.filter(org => org.tramitesOnline?.toLowerCase().trim() === 'tiene');
+      result = result.filter(org => org.tramitesOnline?.toLowerCase().trim() === 'tiene' || org.tramitesOnline?.toLowerCase().trim() === 'si' || org.tramitesOnline?.toLowerCase().trim() === 'sí');
     }
     if (filters.turnosOnline) {
-      result = result.filter(org => org.turnosOnline?.toLowerCase().trim() === 'tiene');
+      result = result.filter(org => org.turnosOnline?.toLowerCase().trim() === 'tiene' || org.turnosOnline?.toLowerCase().trim() === 'si' || org.turnosOnline?.toLowerCase().trim() === 'sí');
     }
     if (filters.expedienteDigital) {
-      result = result.filter(org => org.expedienteDigital?.toLowerCase().trim() === 'tiene');
+      result = result.filter(org => org.expedienteDigital?.toLowerCase().trim() === 'tiene' || org.expedienteDigital?.toLowerCase().trim() === 'si' || org.expedienteDigital?.toLowerCase().trim() === 'sí');
     }
     if (filters.usaIAOrChatbot) {
       result = result.filter(org => org.usaIA || org.chatbot);
+    }
+    if (filters.firmaDigital) {
+      result = result.filter(org => org.firmaDigital?.toLowerCase().trim() === 'tiene' || org.firmaDigital?.toLowerCase().trim() === 'si' || org.firmaDigital?.toLowerCase().trim() === 'sí');
+    }
+    if (filters.analisisProcesos) {
+      result = result.filter(org => org.analisisProcesos?.toLowerCase().trim() === 'tiene' || org.analisisProcesos?.toLowerCase().trim() === 'hizo' || org.analisisProcesos?.toLowerCase().trim() === 'si' || org.analisisProcesos?.toLowerCase().trim() === 'sí');
+    }
+    if (filters.tieneDoco) {
+      result = result.filter(org => org.tieneDoco?.toLowerCase().trim() === 'tiene' || org.tieneDoco?.toLowerCase().trim() === 'si' || org.tieneDoco?.toLowerCase().trim() === 'sí');
+    }
+    if (filters.usaSiif) {
+      result = result.filter(org => org.usaSiif?.toLowerCase().trim() === 'tiene' || org.usaSiif?.toLowerCase().trim() === 'si' || org.usaSiif?.toLowerCase().trim() === 'sí');
     }
 
     // Sort algorithms
@@ -343,15 +372,6 @@ export default function App() {
                   {/* Sliding Tabs */}
                   <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl w-full sm:w-auto relative select-none">
                     <button
-                      onClick={() => setActiveTab('cards')}
-                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
-                        activeTab === 'cards' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      <LayoutGrid className="h-3.5 w-3.5" />
-                      Fichas
-                    </button>
-                    <button
                       onClick={() => setActiveTab('matrix')}
                       className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
                         activeTab === 'matrix' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
@@ -369,6 +389,15 @@ export default function App() {
                       <BarChart3 className="h-3.5 w-3.5" />
                       Métricas
                     </button>
+                    <button
+                      onClick={() => setActiveTab('history')}
+                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
+                        activeTab === 'history' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      <Clock className="h-3.5 w-3.5" />
+                      Historial
+                    </button>
                   </div>
 
                   {/* Results Count Summary */}
@@ -380,38 +409,6 @@ export default function App() {
                 {/* Sub-Views container based on Active Tab */}
                 <div className="min-h-[400px]">
                   <AnimatePresence mode="wait">
-                    {activeTab === 'cards' && (
-                      <motion.div
-                        key="cards-view"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {filteredAndSortedList.length === 0 ? (
-                          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-12 text-center text-slate-500 dark:text-slate-400">
-                            <span className="text-4xl">🔍</span>
-                            <h3 className="font-display font-semibold mt-4 text-slate-800 dark:text-slate-250">No hay resultados</h3>
-                            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                              Intenta ajustar o relajar los filtros en el menú lateral para descubrir organismos.
-                            </p>
-                            <button
-                              onClick={handleResetFilters}
-                              className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl shadow-sm cursor-pointer hover:-translate-y-0.5 transition"
-                            >
-                              Restaurar filtros
-                            </button>
-                          </div>
-                        ) : (
-                          <div id="cardsGrid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredAndSortedList.map((org, i) => (
-                              <OrganismoCard key={org.nombre + i} organismo={org} onEdit={setEditingOrg} />
-                            ))}
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-
                     {activeTab === 'matrix' && (
                       <motion.div
                         key="matrix-view"
@@ -420,7 +417,7 @@ export default function App() {
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
                       >
-                        <MatrixTable organismos={filteredAndSortedList} />
+                        <MatrixTable organismos={filteredAndSortedList} onEdit={setEditingOrg} />
                       </motion.div>
                     )}
 
@@ -433,6 +430,18 @@ export default function App() {
                         transition={{ duration: 0.2 }}
                       >
                         <DigitalMaturityChart organismos={filteredAndSortedList} />
+                      </motion.div>
+                    )}
+
+                    {activeTab === 'history' && (
+                      <motion.div
+                        key="history-view"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <GeneralHistory />
                       </motion.div>
                     )}
                   </AnimatePresence>

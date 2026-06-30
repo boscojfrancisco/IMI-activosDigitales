@@ -66,23 +66,6 @@ export default function FilterSidebar({
         </div>
       </div>
 
-      {/* Tipo de Organismo */}
-      <div className="space-y-1.5">
-        <label htmlFor="typeFilter" className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-          Tipo de Organismo
-        </label>
-        <select
-          id="typeFilter"
-          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={filters.tipo}
-          onChange={(e) => setFilters(prev => ({ ...prev, tipo: e.target.value }))}
-        >
-          <option value="ALL">Todos los niveles</option>
-          {tiposDisponibles.map((tipo, idx) => (
-            <option key={idx} value={tipo}>{tipo || 'Otro'}</option>
-          ))}
-        </select>
-      </div>
 
       {/* Filtros booleanos */}
       <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -160,13 +143,57 @@ export default function FilterSidebar({
           <label className="flex items-center gap-2.5 cursor-pointer text-sm text-slate-700 dark:text-slate-300 select-none">
             <input
               type="checkbox"
+              id="hasFirmaDigital"
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 accent-blue-600 cursor-pointer"
+              checked={filters.firmaDigital}
+              onChange={() => handleCheckboxChange('firmaDigital')}
+            />
+            <span>Tienen Firma Digital</span>
+          </label>
+
+          <label className="flex items-center gap-2.5 cursor-pointer text-sm text-slate-700 dark:text-slate-300 select-none">
+            <input
+              type="checkbox"
+              id="hasAnalisisProcesos"
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 accent-blue-600 cursor-pointer"
+              checked={filters.analisisProcesos}
+              onChange={() => handleCheckboxChange('analisisProcesos')}
+            />
+            <span>Analisis de Procesos con Gcia. Innovacion</span>
+          </label>
+
+          <label className="flex items-center gap-2.5 cursor-pointer text-sm text-slate-700 dark:text-slate-300 select-none">
+            <input
+              type="checkbox"
+              id="hasDoco"
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 accent-blue-600 cursor-pointer"
+              checked={filters.tieneDoco}
+              onChange={() => handleCheckboxChange('tieneDoco')}
+            />
+            <span>Contratado Doco</span>
+          </label>
+
+          <label className="flex items-center gap-2.5 cursor-pointer text-sm text-slate-700 dark:text-slate-300 select-none">
+            <input
+              type="checkbox"
+              id="usesSiif"
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 accent-blue-600 cursor-pointer"
+              checked={filters.usaSiif}
+              onChange={() => handleCheckboxChange('usaSiif')}
+            />
+            <span>Usan SiiF</span>
+          </label>
+
+          <label className="flex items-center gap-2.5 cursor-pointer text-sm text-slate-700 dark:text-slate-300 select-none">
+            <input
+              type="checkbox"
               id="usesIA"
               className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:border-slate-800 dark:bg-slate-950 accent-blue-600 cursor-pointer"
               checked={filters.usaIAOrChatbot}
               onChange={() => handleCheckboxChange('usaIAOrChatbot')}
             />
             <span className="flex items-center gap-1.5">
-              Usa IA o Chatbot Inteligente
+              Tienen IA en sus procesos o Chatbot
               <Sparkles className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
             </span>
           </label>

@@ -1,7 +1,24 @@
 import React from 'react';
 import { Organismo } from '../types';
 import { motion } from 'motion/react';
-import { Globe, BookOpen, Laptop, CalendarCheck, FileText, Bot, Sparkles, ExternalLink, Calendar, CheckCircle2, XCircle, Edit } from 'lucide-react';
+import { 
+  Globe, 
+  BookOpen, 
+  Laptop, 
+  CalendarCheck, 
+  FileText, 
+  Bot, 
+  Sparkles, 
+  ExternalLink, 
+  Calendar, 
+  CheckCircle2, 
+  XCircle, 
+  Edit,
+  FileSignature,
+  GitBranch,
+  ShieldCheck,
+  Coins
+} from 'lucide-react';
 
 interface OrganismoCardProps {
   organismo: Organismo;
@@ -10,12 +27,33 @@ interface OrganismoCardProps {
 
 export function getMaturityGrade(org: Organismo): number {
   let score = 0;
-  if (org.tieneWeb) score += 20;
-  if (org.guiaTramites?.toLowerCase().trim() === 'tiene') score += 20;
-  if (org.tramitesOnline?.toLowerCase().trim() === 'tiene') score += 20;
-  if (org.turnosOnline?.toLowerCase().trim() === 'tiene') score += 15;
-  if (org.expedienteDigital?.toLowerCase().trim() === 'tiene') score += 15;
-  if (org.chatbot || org.usaIA) score += 10;
+  const isYes = (val: string | undefined) => {
+    if (!val) return false;
+    const v = val.toLowerCase().trim();
+    return v === 'tiene' || v === 'si' || v === 'sí' || v === 'hizo';
+  };
+  
+  // 1. Identidad y Presencia Web (15%)
+  if (org.tieneWeb) score += 10;
+  if (org.tieneWebPropia) score += 5;
+
+  // 2. Servicios al Ciudadano (45%)
+  if (isYes(org.guiaTramites)) score += 10;
+  if (isYes(org.tramitesOnline)) score += 20;
+  if (isYes(org.turnosOnline)) score += 5;
+  if (isYes(org.seguimientoTramites)) score += 5;
+  if (isYes(org.atencionDigital)) score += 5;
+
+  // 3. Gestión y Despapelización Interna (30%)
+  if (isYes(org.expedienteDigital)) score += 10;
+  if (isYes(org.firmaDigital)) score += 10;
+  if (isYes(org.tieneDoco)) score += 5;
+  if (isYes(org.analisisProcesos)) score += 5;
+
+  // 4. Sistemas y Modernización (10%)
+  if (isYes(org.usaSiif)) score += 5;
+  if (org.chatbot || org.usaIA) score += 5;
+
   return score;
 }
 
@@ -38,7 +76,6 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
   };
 
   const getPropiaHostname = (urlStr: string) => {
-    // ...
     try {
       let target = urlStr.trim();
       if (!target.startsWith('http://') && !target.startsWith('https://')) {
@@ -63,7 +100,7 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
     const Icon = icon;
     const isYes = typeof value === 'boolean' 
       ? value 
-      : value?.toLowerCase().trim() === 'tiene' || value?.toLowerCase().trim() === 'si' || value?.toLowerCase().trim() === 'sí';
+      : value?.toLowerCase().trim() === 'tiene' || value?.toLowerCase().trim() === 'si' || value?.toLowerCase().trim() === 'sí' || value?.toLowerCase().trim() === 'hizo';
 
     return (
       <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/80 last:border-0">
@@ -112,7 +149,7 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
           {onEdit && (
             <button
               onClick={() => onEdit(organismo)}
-              className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 bg-slate-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 bg-slate-50 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-900/30 rounded-lg transition-colors cursor-pointer"
               aria-label="Editar organismo"
             >
               <Edit className="h-4 w-4" />
@@ -142,7 +179,11 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
           {renderDigitalIndicator('Tramites Online', organismo.tramitesOnline, Laptop)}
           {renderDigitalIndicator('Turnos por Turnero', organismo.turnosOnline, CalendarCheck)}
           {renderDigitalIndicator('Expediente Digital', organismo.expedienteDigital, FileText)}
-          {renderDigitalIndicator('Usa IA / Chatbots', (organismo.chatbot || organismo.usaIA), Bot)}
+          {renderDigitalIndicator('Tienen Firma Digital', organismo.firmaDigital, FileSignature)}
+          {renderDigitalIndicator('Analisis de Procesos con Gcia. Innovacion', organismo.analisisProcesos, GitBranch)}
+          {renderDigitalIndicator('Contratado Doco', organismo.tieneDoco, ShieldCheck)}
+          {renderDigitalIndicator('Usa SiiF', organismo.usaSiif, Coins)}
+          {renderDigitalIndicator('Tienen IA en sus procesos', (organismo.chatbot || organismo.usaIA), Bot)}
         </div>
       </div>
 
@@ -181,7 +222,7 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
         ) : null}
 
         {/* Guide Link */}
-        {organismo.guiaTramites?.toLowerCase().trim() === 'tiene' && isValidUrl(organismo.enlaceGuia) ? (
+        {(organismo.guiaTramites?.toLowerCase().trim() === 'tiene' || organismo.guiaTramites?.toLowerCase().trim() === 'si' || organismo.guiaTramites?.toLowerCase().trim() === 'sí') && isValidUrl(organismo.enlaceGuia) ? (
           <a
             href={ensureAbsoluteUrl(organismo.enlaceGuia)}
             target="_blank"
@@ -197,7 +238,7 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
         ) : null}
 
         {/* Online Procedures Link */}
-        {organismo.tramitesOnline?.toLowerCase().trim() === 'tiene' && isValidUrl(organismo.enlaceTramitesOnline) ? (
+        {(organismo.tramitesOnline?.toLowerCase().trim() === 'tiene' || organismo.tramitesOnline?.toLowerCase().trim() === 'si' || organismo.tramitesOnline?.toLowerCase().trim() === 'sí') && isValidUrl(organismo.enlaceTramitesOnline) ? (
           <a
             href={ensureAbsoluteUrl(organismo.enlaceTramitesOnline)}
             target="_blank"
@@ -207,6 +248,22 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
             <span className="flex items-center gap-1.5">
               <Laptop className="h-3.5 w-3.5 text-emerald-500" />
               Iniciar Trámite Online
+            </span>
+            <ExternalLink className="h-3 w-3 opacity-60" />
+          </a>
+        ) : null}
+
+        {/* Turnos Online Link */}
+        {(organismo.turnosOnline?.toLowerCase().trim() === 'tiene' || organismo.turnosOnline?.toLowerCase().trim() === 'si' || organismo.turnosOnline?.toLowerCase().trim() === 'sí') && isValidUrl(organismo.enlaceTurnosOnline) ? (
+          <a
+            href={ensureAbsoluteUrl(organismo.enlaceTurnosOnline)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center justify-between px-3 py-2 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-semibold text-xs rounded-xl transition cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5">
+              <CalendarCheck className="h-3.5 w-3.5 text-amber-500" />
+              Turnos Online
             </span>
             <ExternalLink className="h-3 w-3 opacity-60" />
           </a>

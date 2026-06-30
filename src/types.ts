@@ -22,9 +22,16 @@ export interface Organismo {
 
   expedienteDigital: string;
   turnosOnline: string;
+  enlaceTurnosOnline?: string;
   atencionDigital: string;
   seguimientoTramites: string;
   
+  // Nuevas Variables Solicitadas
+  firmaDigital: string;
+  analisisProcesos: string;
+  tieneDoco: string;
+  usaSiif: string;
+
   capacitacion: string;
   capacitacionDigital: string;
   usaIA: boolean;
@@ -47,6 +54,10 @@ export interface Stats {
   conExpedienteDigital: number;
   conChatbotOrIA: number;
   conSeguimiento: number;
+  conFirmaDigital: number;
+  conAnalisisProcesos: number;
+  conDoco: number;
+  conSiif: number;
 }
 
 export interface FilterState {
@@ -59,4 +70,8 @@ export interface FilterState {
   turnosOnline: boolean;
   expedienteDigital: boolean;
   usaIAOrChatbot: boolean;
+  firmaDigital: boolean;
+  analisisProcesos: boolean;
+  tieneDoco: boolean;
+  usaSiif: boolean;
 }

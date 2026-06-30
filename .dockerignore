@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.gitignore
+*.md
+.env
+.env.*
+sqlite.db-shm
+sqlite.db-wal
+.vite
+.DS_Store
