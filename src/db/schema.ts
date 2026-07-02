@@ -1,17 +1,17 @@
 import { relations, sql } from 'drizzle-orm';
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { pgTable, serial, text, boolean, integer, timestamp } from 'drizzle-orm/pg-core';
 
-// Representa un organismo/institución
-export const organismos = sqliteTable('organismos', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+// Representa un organismo/institución en PostgreSQL
+export const organismos = pgTable('organismos', {
+  id: serial('id').primaryKey(),
   nombre: text('nombre').notNull(),
   tipo: text('tipo').notNull().default('Desconocido'),
   
   // Website
-  tieneWeb: integer('tiene_web', { mode: 'boolean' }).default(false),
+  tieneWeb: boolean('tiene_web').default(false),
   enlaceWeb: text('enlace_web'),
   enlaceWebGov: text('enlace_web_gov'),
-  tieneWebPropia: integer('tiene_web_propia', { mode: 'boolean' }).default(false),
+  tieneWebPropia: boolean('tiene_web_propia').default(false),
   enlaceWebPropia: text('enlace_web_propia'),
 
   // Tramites
@@ -37,10 +37,10 @@ export const organismos = sqliteTable('organismos', {
   // Extra
   capacitacion: text('capacitacion').default('No'),
   capacitacionDigital: text('capacitacion_digital').default('No'),
-  usaIA: integer('usa_ia', { mode: 'boolean' }).default(false),
-  chatbot: integer('chatbot', { mode: 'boolean' }).default(false),
+  usaIA: boolean('usa_ia').default(false),
+  chatbot: boolean('chatbot').default(false),
   
-  // Nuevas Variables Solicitadas
+  // Nuevas Variables
   firmaDigital: text('firma_digital').default('No'),
   analisisProcesos: text('analisis_procesos').default('No'),
   tieneDoco: text('tiene_doco').default('No'),
@@ -50,20 +50,19 @@ export const organismos = sqliteTable('organismos', {
   nivelConfianza: text('nivel_confianza').default('Bajo'),
   completitud: text('completitud').default('Baja'),
 
-  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
 
 // Representa un registro histórico de cambios de un organismo (cada vez que se actualiza)
-export const indicadoresHistory = sqliteTable('indicadores_history', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const indicadoresHistory = pgTable('indicadores_history', {
+  id: serial('id').primaryKey(),
   organismoId: integer('organismo_id')
-    .references(() => organismos.id)
+    .references(() => organismos.id, { onDelete: 'cascade' })
     .notNull(),
-  // Firebase UID of the user who made the change
   userId: text('user_uid').notNull(),
-  snapshot: text('snapshot').notNull(), // JSON string representing the exact state
-  createdAt: integer('created_at', { mode: 'timestamp' }).default(sql`(strftime('%s', 'now'))`),
+  snapshot: text('snapshot').notNull(), // JSON string
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 });
 
 export const organismosRelations = relations(organismos, ({ many }) => ({
@@ -76,3 +75,4 @@ export const historyRelations = relations(indicadoresHistory, ({ one }) => ({
     references: [organismos.id],
   }),
 }));
+

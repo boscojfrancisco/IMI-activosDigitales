@@ -33,8 +33,7 @@ RUN npm install --omit=dev
 # Copiar el build compilado desde la stage anterior
 COPY --from=builder /app/dist ./dist
 
-# Copiar la base de datos SQLite con los datos actuales
-COPY sqlite.db ./sqlite.db
+# Copiar archivos de configuración necesarios
 COPY tsconfig.json ./tsconfig.json
 
 # Puerto que Cloud Run asigna dinámicamente

@@ -1,11 +1,21 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pkg from 'pg';
+const { Pool } = pkg;
 import * as schema from './schema.ts';
-import path from 'path';
+import dotenv from 'dotenv';
 
-// Create SQLite database in the app folder so it persists across dev reloads
-const sqlite = new Database(path.join(process.cwd(), 'sqlite.db'));
-sqlite.pragma('journal_mode = WAL');
+dotenv.config();
 
-// Initialize Drizzle with the sqlite instance and schema.
-export const db = drizzle(sqlite, { schema });
+// Obtener la URL de conexión desde el entorno
+const connectionString = process.env.DATABASE_URL || 'postgresql://IPECD_Matias:IPECDatos.2026@149.50.145.182:5432/imi_activos_digitales';
+
+const pool = new Pool({
+  connectionString,
+  ssl: connectionString.includes('127.0.0.1') || connectionString.includes('localhost') 
+    ? false 
+    : { rejectUnauthorized: false }
+});
+
+// Inicializar Drizzle para Postgres
+export const db = drizzle(pool, { schema });
+
