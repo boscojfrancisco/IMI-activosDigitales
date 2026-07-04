@@ -32,6 +32,12 @@ export interface Organismo {
   tieneDoco: string;
   usaSiif: string;
 
+  // Reseñas y Metadatos agregados
+  resenaSiif?: string;
+  resenaFirma?: string;
+  chatbotNombre?: string;
+  chatbotResena?: string;
+
   capacitacion: string;
   capacitacionDigital: string;
   usaIA: boolean;
@@ -40,6 +46,7 @@ export interface Organismo {
   fuente: string;
   nivelConfianza: string;
   completitud: string;
+
   
   dateActualizacion?: string; // Kept for backward compatibility
 }

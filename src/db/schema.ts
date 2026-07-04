@@ -45,10 +45,17 @@ export const organismos = pgTable('organismos', {
   analisisProcesos: text('analisis_procesos').default('No'),
   tieneDoco: text('tiene_doco').default('No'),
   usaSiif: text('usa_siif').default('No'),
+
+  // Reseñas y Metadatos agregados
+  resenaSiif: text('resena_siif'),
+  resenaFirma: text('resena_firma'),
+  chatbotNombre: text('chatbot_nombre'),
+  chatbotResena: text('chatbot_resena'),
   
   fuente: text('fuente'),
   nivelConfianza: text('nivel_confianza').default('Bajo'),
   completitud: text('completitud').default('Baja'),
+
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),

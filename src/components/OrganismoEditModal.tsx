@@ -333,7 +333,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved }: Orga
                   )}
                 </div>
 
-                {/* Guía de Trámites */}
+                 {/* Guía de Trámites */}
                 <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Guía de Trámites</span>
@@ -352,13 +352,25 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved }: Orga
                     </button>
                   </div>
                   {(formData.guiaTramites === 'Tiene' || formData.guiaTramites === 'Si') && (
-                    <input
-                      type="url"
-                      placeholder="Enlace Guía (Ej: https://...)"
-                      value={formData.enlaceGuia || ''}
-                      onChange={(e) => handleChange('enlaceGuia', e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none mt-2"
-                    />
+                    <div className="space-y-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      <input
+                        type="url"
+                        placeholder="Enlace Guía (Ej: https://...)"
+                        value={formData.enlaceGuia || ''}
+                        onChange={(e) => handleChange('enlaceGuia', e.target.value)}
+                        className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">CANTIDAD DE TRÁMITES EN LA GUÍA</label>
+                        <input
+                          type="number"
+                          placeholder="Cantidad de trámites"
+                          value={formData.qTramitesGuia !== undefined ? formData.qTramitesGuia : ''}
+                          onChange={(e) => handleChange('qTramitesGuia', parseInt(e.target.value, 10) || 0)}
+                          className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -381,13 +393,25 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved }: Orga
                     </button>
                   </div>
                   {(formData.tramitesOnline === 'Tiene' || formData.tramitesOnline === 'Si') && (
-                    <input
-                      type="url"
-                      placeholder="Enlace Trámites (Ej: https://...)"
-                      value={formData.enlaceTramitesOnline || ''}
-                      onChange={(e) => handleChange('enlaceTramitesOnline', e.target.value)}
-                      className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none mt-2"
-                    />
+                    <div className="space-y-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      <input
+                        type="url"
+                        placeholder="Enlace Trámites (Ej: https://...)"
+                        value={formData.enlaceTramitesOnline || ''}
+                        onChange={(e) => handleChange('enlaceTramitesOnline', e.target.value)}
+                        className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">CANTIDAD DE TRÁMITES ONLINE</label>
+                        <input
+                          type="number"
+                          placeholder="Cantidad de trámites online"
+                          value={formData.qTramitesOnline !== undefined ? formData.qTramitesOnline : ''}
+                          onChange={(e) => handleChange('qTramitesOnline', parseInt(e.target.value, 10) || 0)}
+                          className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -426,9 +450,36 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved }: Orga
                 )}
 
                  {/* Firma Digital */}
-                {renderSwitch('Tienen Firma Digital', formData.firmaDigital, (checked) => 
-                  handleChange('firmaDigital', checked ? 'Si' : 'No')
-                )}
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tienen Firma Digital</span>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('firmaDigital', (formData.firmaDigital === 'Si' || formData.firmaDigital === 'Tiene') ? 'No' : 'Si')}
+                      className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        (formData.firmaDigital === 'Si' || formData.firmaDigital === 'Tiene') ? 'bg-emerald-500' : 'bg-rose-500'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                          (formData.firmaDigital === 'Si' || formData.firmaDigital === 'Tiene') ? 'translate-x-5.5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {(formData.firmaDigital === 'Si' || formData.firmaDigital === 'Tiene') && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">RESEÑA DE LA FIRMA DIGITAL</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Escribí una reseña sobre la Firma Digital en este organismo..."
+                        value={formData.resenaFirma || ''}
+                        onChange={(e) => handleChange('resenaFirma', e.target.value)}
+                        className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {/* Análisis de Procesos */}
                 {renderSwitch('Analisis de Procesos con Gcia. Innovacion', formData.analisisProcesos, (checked) => 
@@ -441,19 +492,103 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved }: Orga
                 )}
 
                 {/* SiiF */}
-                {renderSwitch('Uso de SiiF', formData.usaSiif, (checked) => 
-                  handleChange('usaSiif', checked ? 'Si' : 'No')
-                )}
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Uso de SiiF</span>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('usaSiif', (formData.usaSiif === 'Si' || formData.usaSiif === 'Tiene') ? 'No' : 'Si')}
+                      className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        (formData.usaSiif === 'Si' || formData.usaSiif === 'Tiene') ? 'bg-emerald-500' : 'bg-rose-500'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                          (formData.usaSiif === 'Si' || formData.usaSiif === 'Tiene') ? 'translate-x-5.5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {(formData.usaSiif === 'Si' || formData.usaSiif === 'Tiene') && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">RESEÑA DEL USO DE SIIF</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Escribí una reseña sobre el Uso de SiiF en este organismo..."
+                        value={formData.resenaSiif || ''}
+                        onChange={(e) => handleChange('resenaSiif', e.target.value)}
+                        className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
 
-                {/* Usa IA */}
-                {renderSwitch('Tienen IA en sus procesos', formData.usaIA, (checked) => 
-                  handleChange('usaIA', checked)
-                )}
+                {/* Usa IA y Chatbot */}
+                <div className="space-y-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Switch IA */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tienen IA en sus procesos</span>
+                      <button
+                        type="button"
+                        onClick={() => handleChange('usaIA', !formData.usaIA)}
+                        className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          formData.usaIA ? 'bg-emerald-500' : 'bg-rose-500'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                            formData.usaIA ? 'translate-x-5.5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
 
-                {/* Chatbot */}
-                {renderSwitch('Tiene Chatbot', formData.chatbot, (checked) => 
-                  handleChange('chatbot', checked)
-                )}
+                    {/* Switch Chatbot */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tiene Chatbot</span>
+                      <button
+                        type="button"
+                        onClick={() => handleChange('chatbot', !formData.chatbot)}
+                        className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                          formData.chatbot ? 'bg-emerald-500' : 'bg-rose-500'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                            formData.chatbot ? 'translate-x-5.5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+
+                  {(formData.chatbot || formData.usaIA) && (
+                    <div className="space-y-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">NOMBRE DEL CHATBOT / SISTEMA IA</label>
+                        <input
+                          type="text"
+                          placeholder="Ej: Chatbot Corrientes, Asistente de Trámites..."
+                          value={formData.chatbotNombre || ''}
+                          onChange={(e) => handleChange('chatbotNombre', e.target.value)}
+                          className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">RESEÑA DEL CHATBOT / PROCESO DE IA</label>
+                        <textarea
+                          rows={2}
+                          placeholder="Breve reseña sobre cómo asiste al ciudadano o automatiza procesos..."
+                          value={formData.chatbotResena || ''}
+                          onChange={(e) => handleChange('chatbotResena', e.target.value)}
+                          className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
 
               </div>
             </form>
