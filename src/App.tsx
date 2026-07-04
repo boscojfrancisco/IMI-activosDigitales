@@ -288,12 +288,33 @@ export default function App() {
           </div>
 
           {/* Quick Stats/Actions & Dark Toggle */}
-          <div className="flex items-center gap-3 self-end sm:self-auto">
+          <div className="flex items-center gap-2 self-end sm:self-auto">
             {/* Clock Widget */}
             <div className="hidden md:flex items-center gap-2 px-3.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-500 dark:text-slate-400 font-mono shadow-sm">
               <Clock className="h-3.5 w-3.5 text-blue-500 shrink-0" />
               <span>{currentTime.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
             </div>
+
+            {/* Refresh Button */}
+            <button
+              onClick={() => loadData(true)}
+              disabled={refreshing}
+              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer flex items-center justify-center disabled:opacity-50"
+              title="Sincronizar datos con Google Sheets"
+              aria-label="Sincronizar datos"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+
+            {/* Export JSON Button */}
+            <button
+              onClick={handleExportDataJson}
+              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer flex items-center justify-center"
+              title="Exportar datos a JSON"
+              aria-label="Exportar datos"
+            >
+              <ArrowRightCircle className="h-4 w-4 rotate-90 text-blue-500" />
+            </button>
 
             {/* Dark Mode toggle */}
             <button
@@ -305,6 +326,7 @@ export default function App() {
               {isDark ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4 text-indigo-500" />}
             </button>
           </div>
+
         </header>
 
         {/* Loading Indicator */}
@@ -346,25 +368,10 @@ export default function App() {
             />
 
             {/* Dashboard Workspace */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+            <div className="w-full space-y-6">
               
-              {/* Left Column - Filters Panel */}
-              <div className="lg:col-span-1">
-                <FilterSidebar
-                  filters={filters}
-                  setFilters={setFilters}
-                  tiposDisponibles={tiposDisponibles}
-                  onReset={handleResetFilters}
-                  onExport={handleExportDataJson}
-                  onRefresh={() => loadData(true)}
-                  loading={refreshing}
-                  sortBy={sortBy}
-                  setSortBy={setSortBy}
-                />
-              </div>
-
-              {/* Right Column - Results Display */}
-              <div className="lg:col-span-3 space-y-6">
+              {/* Results Display */}
+              <div className="w-full space-y-6">
                 
                 {/* Tab Navigator & Filter Metainfo bar */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-2.5 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
@@ -450,6 +457,7 @@ export default function App() {
               </div>
 
             </div>
+
 
           </motion.div>
         )}
