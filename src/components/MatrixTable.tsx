@@ -25,6 +25,15 @@ interface MatrixTableProps {
 
 export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
   const [rowSearch, setRowSearch] = useState('');
+  const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
+
+  const toggleReview = (orgId: number, colLabel: string) => {
+    const key = `${orgId}-${colLabel}`;
+    setExpandedReviews(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
 
   const columnsDef = [
     // Eje 1: Servicios Ciudadanos
@@ -33,7 +42,7 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.tramitesOnline?.toLowerCase().trim() === 'tiene' || o.tramitesOnline?.toLowerCase().trim() === 'si' || o.tramitesOnline?.toLowerCase().trim() === 'sí',
       badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
       headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
-      renderDetails: (o: Organismo) => (
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => (
         <div className="text-[10px] mt-1 space-y-0.5 text-slate-500">
           {o.qTramitesOnline ? <span className="font-semibold text-cyan-600 dark:text-cyan-400 block">{o.qTramitesOnline} tráms</span> : null}
           {isValidUrl(o.enlaceTramitesOnline) && (
@@ -49,7 +58,7 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.guiaTramites?.toLowerCase().trim() === 'tiene' || o.guiaTramites?.toLowerCase().trim() === 'si' || o.guiaTramites?.toLowerCase().trim() === 'sí',
       badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
       headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
-      renderDetails: (o: Organismo) => (
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => (
         <div className="text-[10px] mt-1 space-y-0.5 text-slate-500">
           {o.qTramitesGuia ? <span className="font-semibold text-cyan-600 dark:text-cyan-400 block">{o.qTramitesGuia} tráms</span> : null}
           {isValidUrl(o.enlaceGuia) && (
@@ -65,7 +74,7 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.turnosOnline?.toLowerCase().trim() === 'tiene' || o.turnosOnline?.toLowerCase().trim() === 'si' || o.turnosOnline?.toLowerCase().trim() === 'sí',
       badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
       headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
-      renderDetails: (o: Organismo) => isValidUrl(o.enlaceTurnosOnline) ? (
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => isValidUrl(o.enlaceTurnosOnline) ? (
         <a href={ensureAbsoluteUrl(o.enlaceTurnosOnline)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] text-cyan-500 hover:underline mt-1">
           <span>Turnero</span> <ExternalLink className="h-2.5 w-2.5" />
         </a>
@@ -95,10 +104,20 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.firmaDigital?.toLowerCase().trim() === 'tiene' || o.firmaDigital?.toLowerCase().trim() === 'si' || o.firmaDigital?.toLowerCase().trim() === 'sí',
       badgeColor: 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40',
       headerBg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
-      renderDetails: (o: Organismo) => o.resenaFirma ? (
-        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1 leading-tight max-w-[160px] mx-auto whitespace-normal" title={o.resenaFirma}>
-          "{o.resenaFirma}"
-        </p>
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => o.resenaFirma ? (
+        <div className="flex flex-col items-center">
+          <button
+            onClick={onToggle}
+            className="mt-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline cursor-pointer"
+          >
+            {isExpanded ? 'Ocultar nota' : 'Ver nota'}
+          </button>
+          {isExpanded && (
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1.5 leading-tight max-w-[160px] mx-auto whitespace-normal bg-slate-50 dark:bg-slate-950/50 p-1.5 rounded border border-slate-150 dark:border-slate-800/60 shadow-sm animate-fadeIn">
+              "{o.resenaFirma}"
+            </p>
+          )}
+        </div>
       ) : null
     },
     { 
@@ -112,10 +131,20 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.usaSiif?.toLowerCase().trim() === 'tiene' || o.usaSiif?.toLowerCase().trim() === 'si' || o.usaSiif?.toLowerCase().trim() === 'sí',
       badgeColor: 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40',
       headerBg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
-      renderDetails: (o: Organismo) => o.resenaSiif ? (
-        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1 leading-tight max-w-[160px] mx-auto whitespace-normal" title={o.resenaSiif}>
-          "{o.resenaSiif}"
-        </p>
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => o.resenaSiif ? (
+        <div className="flex flex-col items-center">
+          <button
+            onClick={onToggle}
+            className="mt-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline cursor-pointer"
+          >
+            {isExpanded ? 'Ocultar nota' : 'Ver nota'}
+          </button>
+          {isExpanded && (
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1.5 leading-tight max-w-[160px] mx-auto whitespace-normal bg-slate-50 dark:bg-slate-950/50 p-1.5 rounded border border-slate-150 dark:border-slate-800/60 shadow-sm animate-fadeIn">
+              "{o.resenaSiif}"
+            </p>
+          )}
+        </div>
       ) : null
     },
     // Eje 3: Identidad Web
@@ -124,7 +153,7 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.tieneWeb,
       badgeColor: 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40',
       headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/30',
-      renderDetails: (o: Organismo) => isValidUrl(o.enlaceWebGov) ? (
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => isValidUrl(o.enlaceWebGov) ? (
         <a href={ensureAbsoluteUrl(o.enlaceWebGov)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] text-indigo-500 hover:underline mt-1">
           <span>Portal</span> <ExternalLink className="h-2 w-2" />
         </a>
@@ -135,7 +164,7 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.tieneWebPropia,
       badgeColor: 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40',
       headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/30',
-      renderDetails: (o: Organismo) => isValidUrl(o.enlaceWebPropia) ? (
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => isValidUrl(o.enlaceWebPropia) ? (
         <a href={ensureAbsoluteUrl(o.enlaceWebPropia)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] text-indigo-500 hover:underline mt-1">
           <span>Propio</span> <ExternalLink className="h-2 w-2" />
         </a>
@@ -153,10 +182,20 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.usaIA,
       badgeColor: 'bg-violet-50 dark:bg-violet-950/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800/40',
       headerBg: 'bg-violet-50/80 dark:bg-violet-950/30',
-      renderDetails: (o: Organismo) => o.resenaIa ? (
-        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1 leading-tight max-w-[160px] mx-auto whitespace-normal" title={o.resenaIa}>
-          "{o.resenaIa}"
-        </p>
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => o.resenaIa ? (
+        <div className="flex flex-col items-center">
+          <button
+            onClick={onToggle}
+            className="mt-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline cursor-pointer"
+          >
+            {isExpanded ? 'Ocultar nota' : 'Ver nota'}
+          </button>
+          {isExpanded && (
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1.5 leading-tight max-w-[160px] mx-auto whitespace-normal bg-slate-50 dark:bg-slate-950/50 p-1.5 rounded border border-slate-150 dark:border-slate-800/60 shadow-sm animate-fadeIn">
+              "{o.resenaIa}"
+            </p>
+          )}
+        </div>
       ) : null
     },
     { 
@@ -164,10 +203,20 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
       check: (o: Organismo) => o.chatbot,
       badgeColor: 'bg-violet-50 dark:bg-violet-950/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800/40',
       headerBg: 'bg-violet-50/80 dark:bg-violet-950/30',
-      renderDetails: (o: Organismo) => o.chatbotResena ? (
-        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1 leading-tight max-w-[160px] mx-auto whitespace-normal" title={o.chatbotResena}>
-          "{o.chatbotResena}"
-        </p>
+      renderDetails: (o: Organismo, isExpanded: boolean, onToggle: () => void) => o.chatbotResena ? (
+        <div className="flex flex-col items-center">
+          <button
+            onClick={onToggle}
+            className="mt-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline cursor-pointer"
+          >
+            {isExpanded ? 'Ocultar nota' : 'Ver nota'}
+          </button>
+          {isExpanded && (
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1.5 leading-tight max-w-[160px] mx-auto whitespace-normal bg-slate-50 dark:bg-slate-950/50 p-1.5 rounded border border-slate-150 dark:border-slate-800/60 shadow-sm animate-fadeIn">
+              "{o.chatbotResena}"
+            </p>
+          )}
+        </div>
       ) : null
     }
   ];
@@ -280,7 +329,12 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
                                   <Check className="h-3 w-3 shrink-0" />
                                   <span>SÍ</span>
                                 </span>
-                                {col.renderDetails && col.renderDetails(org)}
+                                {col.renderDetails && col.renderDetails(
+                                  org,
+                                  !!expandedReviews[`${org.id}-${col.label}`],
+                                  () => toggleReview(org.id, col.label)
+                                )}
+
                               </>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-2 py-0.5 rounded">
