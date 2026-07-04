@@ -24,28 +24,157 @@ interface MatrixTableProps {
 }
 
 export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
-  const [columnSearch, setColumnSearch] = useState('');
+  const [rowSearch, setRowSearch] = useState('');
 
-  const variables = [
-    { label: 'Sitio Web General', check: (o: Organismo) => o.tieneWeb },
-    { label: 'Dominio Propio (Indep.)', check: (o: Organismo) => o.tieneWebPropia },
-    { label: 'Guía de Trámites', check: (o: Organismo) => o.guiaTramites?.toLowerCase().trim() === 'tiene' || o.guiaTramites?.toLowerCase().trim() === 'si' || o.guiaTramites?.toLowerCase().trim() === 'sí' },
-    { label: 'Tramites Online', check: (o: Organismo) => o.tramitesOnline?.toLowerCase().trim() === 'tiene' || o.tramitesOnline?.toLowerCase().trim() === 'si' || o.tramitesOnline?.toLowerCase().trim() === 'sí' },
-    { label: 'Turnos Online', check: (o: Organismo) => o.turnosOnline?.toLowerCase().trim() === 'tiene' || o.turnosOnline?.toLowerCase().trim() === 'si' || o.turnosOnline?.toLowerCase().trim() === 'sí' },
-    { label: 'Expediente Digital', check: (o: Organismo) => o.expedienteDigital?.toLowerCase().trim() === 'tiene' || o.expedienteDigital?.toLowerCase().trim() === 'si' || o.expedienteDigital?.toLowerCase().trim() === 'sí' },
-    { label: 'Seguimiento Digital', check: (o: Organismo) => o.seguimientoTramites?.toLowerCase().trim() === 'tiene' || o.seguimientoTramites?.toLowerCase().trim() === 'si' || o.seguimientoTramites?.toLowerCase().trim() === 'sí' },
-    { label: 'Atención Digital', check: (o: Organismo) => o.atencionDigital?.toLowerCase().trim() === 'tiene' || o.atencionDigital?.toLowerCase().trim() === 'si' || o.atencionDigital?.toLowerCase().trim() === 'sí' },
-    { label: 'Tienen Firma Digital', check: (o: Organismo) => o.firmaDigital?.toLowerCase().trim() === 'tiene' || o.firmaDigital?.toLowerCase().trim() === 'si' || o.firmaDigital?.toLowerCase().trim() === 'sí' },
-    { label: 'Analisis de Procesos con Gcia. Innovacion', check: (o: Organismo) => o.analisisProcesos?.toLowerCase().trim() === 'tiene' || o.analisisProcesos?.toLowerCase().trim() === 'hizo' || o.analisisProcesos?.toLowerCase().trim() === 'si' || o.analisisProcesos?.toLowerCase().trim() === 'sí' },
-    { label: 'Contratado Doco', check: (o: Organismo) => o.tieneDoco?.toLowerCase().trim() === 'tiene' || o.tieneDoco?.toLowerCase().trim() === 'si' || o.tieneDoco?.toLowerCase().trim() === 'sí' },
-    { label: 'Usan SiiF', check: (o: Organismo) => o.usaSiif?.toLowerCase().trim() === 'tiene' || o.usaSiif?.toLowerCase().trim() === 'si' || o.usaSiif?.toLowerCase().trim() === 'sí' },
-    { label: 'Tienen IA en sus procesos', check: (o: Organismo) => o.usaIA },
-    { label: 'Chatbot Integrado', check: (o: Organismo) => o.chatbot }
+  const columnsDef = [
+    // Eje 1: Servicios Ciudadanos
+    { 
+      label: 'Trámites Online', 
+      check: (o: Organismo) => o.tramitesOnline?.toLowerCase().trim() === 'tiene' || o.tramitesOnline?.toLowerCase().trim() === 'si' || o.tramitesOnline?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
+      headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
+      renderDetails: (o: Organismo) => (
+        <div className="text-[10px] mt-1 space-y-0.5 text-slate-500">
+          {o.qTramitesOnline ? <span className="font-semibold text-cyan-600 dark:text-cyan-400 block">{o.qTramitesOnline} tráms</span> : null}
+          {isValidUrl(o.enlaceTramitesOnline) && (
+            <a href={ensureAbsoluteUrl(o.enlaceTramitesOnline)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-cyan-500 hover:underline">
+              <span>Enlace</span> <ExternalLink className="h-2 w-2" />
+            </a>
+          )}
+        </div>
+      )
+    },
+    { 
+      label: 'Guía de Trámites', 
+      check: (o: Organismo) => o.guiaTramites?.toLowerCase().trim() === 'tiene' || o.guiaTramites?.toLowerCase().trim() === 'si' || o.guiaTramites?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
+      headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
+      renderDetails: (o: Organismo) => (
+        <div className="text-[10px] mt-1 space-y-0.5 text-slate-500">
+          {o.qTramitesGuia ? <span className="font-semibold text-cyan-600 dark:text-cyan-400 block">{o.qTramitesGuia} tráms</span> : null}
+          {isValidUrl(o.enlaceGuia) && (
+            <a href={ensureAbsoluteUrl(o.enlaceGuia)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-cyan-500 hover:underline">
+              <span>Enlace</span> <ExternalLink className="h-2 w-2" />
+            </a>
+          )}
+        </div>
+      )
+    },
+    { 
+      label: 'Turnos Online', 
+      check: (o: Organismo) => o.turnosOnline?.toLowerCase().trim() === 'tiene' || o.turnosOnline?.toLowerCase().trim() === 'si' || o.turnosOnline?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
+      headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
+      renderDetails: (o: Organismo) => isValidUrl(o.enlaceTurnosOnline) ? (
+        <a href={ensureAbsoluteUrl(o.enlaceTurnosOnline)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] text-cyan-500 hover:underline mt-1">
+          <span>Turnero</span> <ExternalLink className="h-2.5 w-2.5" />
+        </a>
+      ) : null
+    },
+    { 
+      label: 'Seguimiento Digital', 
+      check: (o: Organismo) => o.seguimientoTramites?.toLowerCase().trim() === 'tiene' || o.seguimientoTramites?.toLowerCase().trim() === 'si' || o.seguimientoTramites?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
+      headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
+    },
+    { 
+      label: 'Atención Digital', 
+      check: (o: Organismo) => o.atencionDigital?.toLowerCase().trim() === 'tiene' || o.atencionDigital?.toLowerCase().trim() === 'si' || o.atencionDigital?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
+      headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
+    },
+    // Eje 2: Eficiencia Interna
+    { 
+      label: 'Expediente Digital', 
+      check: (o: Organismo) => o.expedienteDigital?.toLowerCase().trim() === 'tiene' || o.expedienteDigital?.toLowerCase().trim() === 'si' || o.expedienteDigital?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40',
+      headerBg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
+    },
+    { 
+      label: 'Tienen Firma Digital', 
+      check: (o: Organismo) => o.firmaDigital?.toLowerCase().trim() === 'tiene' || o.firmaDigital?.toLowerCase().trim() === 'si' || o.firmaDigital?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40',
+      headerBg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
+      renderDetails: (o: Organismo) => o.resenaFirma ? (
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1 leading-tight max-w-[160px] mx-auto whitespace-normal" title={o.resenaFirma}>
+          "{o.resenaFirma}"
+        </p>
+      ) : null
+    },
+    { 
+      label: 'Contratado Doco', 
+      check: (o: Organismo) => o.tieneDoco?.toLowerCase().trim() === 'tiene' || o.tieneDoco?.toLowerCase().trim() === 'si' || o.tieneDoco?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40',
+      headerBg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
+    },
+    { 
+      label: 'Uso de SiiF', 
+      check: (o: Organismo) => o.usaSiif?.toLowerCase().trim() === 'tiene' || o.usaSiif?.toLowerCase().trim() === 'si' || o.usaSiif?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/40',
+      headerBg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
+      renderDetails: (o: Organismo) => o.resenaSiif ? (
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1 leading-tight max-w-[160px] mx-auto whitespace-normal" title={o.resenaSiif}>
+          "{o.resenaSiif}"
+        </p>
+      ) : null
+    },
+    // Eje 3: Identidad Web
+    { 
+      label: 'Sitio Web Oficial', 
+      check: (o: Organismo) => o.tieneWeb,
+      badgeColor: 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40',
+      headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/30',
+      renderDetails: (o: Organismo) => isValidUrl(o.enlaceWebGov) ? (
+        <a href={ensureAbsoluteUrl(o.enlaceWebGov)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] text-indigo-500 hover:underline mt-1">
+          <span>Portal</span> <ExternalLink className="h-2 w-2" />
+        </a>
+      ) : null
+    },
+    { 
+      label: 'Sitio Web Propio', 
+      check: (o: Organismo) => o.tieneWebPropia,
+      badgeColor: 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40',
+      headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/30',
+      renderDetails: (o: Organismo) => isValidUrl(o.enlaceWebPropia) ? (
+        <a href={ensureAbsoluteUrl(o.enlaceWebPropia)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-[10px] text-indigo-500 hover:underline mt-1">
+          <span>Propio</span> <ExternalLink className="h-2 w-2" />
+        </a>
+      ) : null
+    },
+    // Eje 4: Innovación y Procesos
+    { 
+      label: 'Análisis de Procesos', 
+      check: (o: Organismo) => o.analisisProcesos?.toLowerCase().trim() === 'tiene' || o.analisisProcesos?.toLowerCase().trim() === 'hizo' || o.analisisProcesos?.toLowerCase().trim() === 'si' || o.analisisProcesos?.toLowerCase().trim() === 'sí',
+      badgeColor: 'bg-violet-50 dark:bg-violet-950/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800/40',
+      headerBg: 'bg-violet-50/80 dark:bg-violet-950/30',
+    },
+    { 
+      label: 'IA en Procesos', 
+      check: (o: Organismo) => o.usaIA,
+      badgeColor: 'bg-violet-50 dark:bg-violet-950/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800/40',
+      headerBg: 'bg-violet-50/80 dark:bg-violet-950/30',
+      renderDetails: (o: Organismo) => o.resenaIa ? (
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1 leading-tight max-w-[160px] mx-auto whitespace-normal" title={o.resenaIa}>
+          "{o.resenaIa}"
+        </p>
+      ) : null
+    },
+    { 
+      label: 'Tiene Chatbot', 
+      check: (o: Organismo) => o.chatbot,
+      badgeColor: 'bg-violet-50 dark:bg-violet-950/20 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800/40',
+      headerBg: 'bg-violet-50/80 dark:bg-violet-950/30',
+      renderDetails: (o: Organismo) => o.chatbotResena ? (
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 italic mt-1 leading-tight max-w-[160px] mx-auto whitespace-normal" title={o.chatbotResena}>
+          "{o.chatbotResena}"
+        </p>
+      ) : null
+    }
   ];
 
-  // Filter columns (organismos) by search input if needed
+  // Filtrar organismos por nombre (filas)
   const filteredOrganismos = organismos.filter(o =>
-    o.nombre.toLowerCase().includes(columnSearch.toLowerCase())
+    o.nombre.toLowerCase().includes(rowSearch.toLowerCase())
   );
 
   return (
@@ -56,18 +185,18 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
             Matriz Comparativa de Capacidades Digitales
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Vista horizontal completa de variables reguladas de digitalización pública.
+            Organismos gubernamentales en las filas y variables reguladas en las columnas, con reseñas detalladas en la misma fila.
           </p>
         </div>
         
-        {/* Sub-Búsqueda de Columnas */}
+        {/* Búsqueda de Organismos (Filas) */}
         <div className="relative w-full sm:w-64">
           <input
             type="text"
             className="w-full pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none focus:ring-1.5 focus:ring-blue-500"
-            placeholder="Filtrar organismos en matriz..."
-            value={columnSearch}
-            onChange={(e) => setColumnSearch(e.target.value)}
+            placeholder="Filtrar organismos..."
+            value={rowSearch}
+            onChange={(e) => setRowSearch(e.target.value)}
           />
           <Search className="absolute left-2.5 top-2.2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
         </div>
@@ -82,98 +211,90 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
           <table className="w-full text-xs text-center border-separate border-spacing-0">
             <thead className="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300">
               <tr>
-                <th className="sticky left-0 z-40 bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-bold px-4 py-3 border-b border-r border-slate-200 dark:border-slate-800 text-left min-w-[220px] max-w-[220px] shadow-[3px_0_6px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_6px_rgba(0,0,0,0.2)]">
-                  Variable de Digitalización
+                {/* Primera columna: Nombre del Organismo */}
+                <th className="sticky left-0 z-40 bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-bold px-4 py-3 border-b border-r border-slate-200 dark:border-slate-800 text-left min-w-[240px] max-w-[240px] shadow-[3px_0_6px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_6px_rgba(0,0,0,0.2)]">
+                  Organismo / Institución
                 </th>
-                {filteredOrganismos.map((org, i) => {
-                  const score = getMaturityGrade(org);
-                  return (
-                    <th key={i} className="px-3 py-3 border-b border-r border-slate-200 dark:border-slate-800 font-bold min-w-[170px] max-w-[210px] truncate group bg-slate-50 dark:bg-slate-950 relative">
-                      <div className="flex flex-col items-center gap-1.5 w-full">
-                        <div className="flex items-center justify-center gap-1 w-full px-1">
-                          <span className="truncate block text-[13px] text-slate-800 dark:text-slate-200" title={org.nombre}>
+                {/* Columnas dinámicas: Variables del IMDP */}
+                {columnsDef.map((col, idx) => (
+                  <th 
+                    key={idx} 
+                    className={`px-3 py-3 border-b border-r border-slate-200 dark:border-slate-800 font-bold min-w-[160px] max-w-[190px] text-center ${col.headerBg}`}
+                  >
+                    <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight">
+                      {col.label}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filteredOrganismos.map((org, i) => {
+                const score = getMaturityGrade(org);
+                return (
+                  <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                    {/* Celda del Organismo (Sticky Left) */}
+                    <td className="sticky left-0 z-20 bg-white dark:bg-slate-900 border-b border-r border-slate-200 dark:border-slate-800 text-left min-w-[240px] max-w-[240px] shadow-[3px_0_6px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_6px_rgba(0,0,0,0.2)] p-3">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-start justify-between gap-1">
+                          <span className="font-semibold text-slate-800 dark:text-slate-200 leading-tight text-xs block pr-4">
                             {org.nombre}
                           </span>
                           {onEdit && (
                             <button
                               onClick={() => onEdit(org)}
-                              className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md transition-colors cursor-pointer shrink-0"
+                              className="p-1 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-250 dark:hover:bg-slate-800 rounded transition-colors cursor-pointer shrink-0"
                               title={`Editar ${org.nombre}`}
                             >
                               <Edit className="h-3.5 w-3.5" />
                             </button>
                           )}
                         </div>
-                        <span className="text-xs font-bold font-mono bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded shadow-sm">
-                          {score}% madurez
-                        </span>
-                      </div>
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {variables.map((v, idx) => (
-                <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                  <td className="sticky left-0 z-20 bg-white dark:bg-slate-900 font-semibold px-4 py-3 border-b border-r border-slate-200 dark:border-slate-800 text-left min-w-[220px] max-w-[220px] text-slate-700 dark:text-slate-300 shadow-[3px_0_6px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_6px_rgba(0,0,0,0.2)]">
-                    <span>{v.label}</span>
-                  </td>
-                  {filteredOrganismos.map((org, i) => {
-                    const ok = v.check(org);
-                    return (
-                      <td
-                        key={i}
-                        className={`p-2 border-b border-r border-slate-200 dark:border-slate-800 transition-colors ${
-                          ok
-                            ? 'bg-emerald-500/10 dark:bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 font-bold'
-                            : 'bg-rose-500/5 dark:bg-rose-500/2 text-rose-500/70'
-                        }`}
-                      >
-                        <div className="flex items-center justify-center gap-1">
-                           {ok ? (
-                            v.label === 'Dominio Propio (Indep.)' && isValidUrl(org.enlaceWebPropia) ? (
-                              <a
-                                href={ensureAbsoluteUrl(org.enlaceWebPropia)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded cursor-pointer transition"
-                                title={`Visitar sitio propio de ${org.nombre}`}
-                              >
-                                <Check className="h-3 w-3 shrink-0" />
-                                <span>Sí</span>
-                                <ExternalLink className="h-2.5 w-2.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                              </a>
-                            ) : v.label === 'Sitio Web General' && isValidUrl(org.enlaceWebGov) ? (
-                              <a
-                                href={ensureAbsoluteUrl(org.enlaceWebGov)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 font-bold px-1.5 py-0.5 rounded cursor-pointer transition"
-                                title={`Ver en Portal de Gobierno para ${org.nombre}`}
-                              >
-                                <Check className="h-3 w-3 shrink-0" />
-                                <span>Sí</span>
-                                <ExternalLink className="h-2.5 w-2.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                              </a>
-                            ) : (
-                              <>
-                                <Check className="h-3.5 w-3.5 bg-emerald-100 dark:bg-emerald-950/40 rounded-full p-0.5" />
-                                <span>Sí</span>
-                              </>
-                            )
-                          ) : (
-                            <>
-                              <X className="h-3.5 w-3.5 bg-rose-100 dark:bg-rose-950/40 rounded-full p-0.5" />
-                              <span>No</span>
-                            </>
-                          )}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500">
+                            {org.tipo || 'Organismo'}
+                          </span>
+                          <span className="text-[10px] font-bold font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-1.5 py-0.2 rounded">
+                            {score}%
+                          </span>
                         </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                      </div>
+                    </td>
+
+                    {/* Celdas de Capacidades y Reseñas */}
+                    {columnsDef.map((col, idx) => {
+                      const ok = col.check(org);
+                      return (
+                        <td
+                          key={idx}
+                          className={`p-3 border-b border-r border-slate-200 dark:border-slate-800 transition-colors ${
+                            ok
+                              ? 'bg-emerald-500/[0.04] dark:bg-emerald-500/[0.02]'
+                              : 'bg-rose-500/[0.02] dark:bg-rose-500/[0.01]'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center justify-center w-full min-h-[45px]">
+                            {ok ? (
+                              <>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
+                                  <Check className="h-3 w-3 shrink-0" />
+                                  <span>SÍ</span>
+                                </span>
+                                {col.renderDetails && col.renderDetails(org)}
+                              </>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-2 py-0.5 rounded">
+                                <X className="h-3 w-3 shrink-0" />
+                                <span>NO</span>
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -185,9 +306,9 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
         <div className="flex items-start gap-2.5 bg-blue-50/50 dark:bg-slate-950/30 border border-blue-100 dark:border-slate-800/80 p-4 rounded-xl text-xs text-slate-700 dark:text-slate-300 shadow-sm">
           <Info className="h-4.5 w-4.5 text-blue-500 shrink-0 mt-0.5" />
           <div>
-            <h5 className="font-semibold text-blue-900 dark:text-blue-400 mb-1">Navegación horizontal fluida</h5>
+            <h5 className="font-semibold text-blue-900 dark:text-blue-400 mb-1">Visualización horizontal y vertical</h5>
             <p className="leading-relaxed">
-              Puedes arrastrar horizontalmente con el botón central del mouse o deslizar con dos dedos en touchpads para recorrer los distintos organismos de la matriz comparativa de capacidades digitales.
+              Puedes desplazarte horizontalmente para ver todas las variables digitales y verticalmente por toda la página para recorrer los 41 organismos. La primera columna con el nombre de cada institución permanecerá visible en todo momento.
             </p>
           </div>
         </div>
@@ -229,7 +350,7 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
               </div>
               <div className="flex items-center justify-between p-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/50 rounded px-2">
                 <span className="font-medium">Turnos Online</span>
-                <span className="font-bold text-slate-550 dark:text-slate-500 font-mono">5%</span>
+                <span className="font-bold text-slate-550 dark:text-slate-550 font-mono">5%</span>
               </div>
               <div className="flex items-center justify-between p-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/50 rounded px-2">
                 <span className="font-medium">Seguimiento Trám.</span>
@@ -237,11 +358,11 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
               </div>
               <div className="flex items-center justify-between p-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/50 rounded px-2">
                 <span className="font-medium">Atención Digital</span>
-                <span className="font-bold text-slate-550 dark:text-slate-500 font-mono">5%</span>
+                <span className="font-bold text-slate-550 dark:text-slate-550 font-mono">5%</span>
               </div>
               <div className="flex items-center justify-between p-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/50 rounded px-2">
                 <span className="font-medium">Contratado Doco / SiiF</span>
-                <span className="font-bold text-slate-550 dark:text-slate-500 font-mono">5% c/u</span>
+                <span className="font-bold text-slate-550 dark:text-slate-550 font-mono">5% c/u</span>
               </div>
               <div className="flex items-center justify-between p-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/50 rounded col-span-2 px-2">
                 <span className="font-medium">Tienen IA en sus procesos o Chatbot / Analisis de Procesos con Gcia. Innovacion</span>
@@ -255,3 +376,4 @@ export default function MatrixTable({ organismos, onEdit }: MatrixTableProps) {
     </div>
   );
 }
+
