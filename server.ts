@@ -177,8 +177,10 @@ app.put('/api/organismos/:id', async (req, res) => {
       'expedienteDigital', 'usaIA', 'chatbot', 'turnosOnline', 'enlaceTurnosOnline',
       'seguimientoTramites', 'atencionDigital', 'capacitacion', 'capacitacionDigital',
       'fuente', 'nivelConfianza', 'completitud',
-      'firmaDigital', 'analisisProcesos', 'tieneDoco', 'usaSiif'
+      'firmaDigital', 'analisisProcesos', 'tieneDoco', 'usaSiif',
+      'resenaSiif', 'resenaFirma', 'resenaIa', 'chatbotResena'
     ];
+
 
     const updateFields: any = {};
     for (const key of allowedKeys) {
