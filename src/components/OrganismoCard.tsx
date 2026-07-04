@@ -187,7 +187,7 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
         </div>
 
         {/* Reseñas y Notas de Implementación */}
-        {(organismo.resenaSiif || organismo.resenaFirma || organismo.chatbotNombre || organismo.chatbotResena) && (
+        {(organismo.resenaSiif || organismo.resenaFirma || organismo.resenaIa || organismo.chatbotResena) && (
           <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-850 rounded-xl space-y-2.5 text-[11px] text-slate-650 dark:text-slate-400">
             <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">Notas de Implementación</span>
             
@@ -205,18 +205,22 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
               </div>
             )}
 
-            {(organismo.chatbotNombre || organismo.chatbotResena) && (
+            {organismo.resenaIa && (
               <div className="space-y-0.5">
-                <span className="font-bold text-slate-700 dark:text-slate-350 block">
-                  Chatbot: <span className="font-semibold text-blue-600 dark:text-blue-400">{organismo.chatbotNombre || 'Asistente Virtual'}</span>
-                </span>
-                {organismo.chatbotResena && (
-                  <p className="italic leading-normal pl-2 border-l border-slate-200 dark:border-slate-800">{organismo.chatbotResena}</p>
-                )}
+                <span className="font-bold text-slate-700 dark:text-slate-350 block">IA en sus Procesos:</span>
+                <p className="italic leading-normal pl-2 border-l border-slate-200 dark:border-slate-800">{organismo.resenaIa}</p>
+              </div>
+            )}
+
+            {organismo.chatbotResena && (
+              <div className="space-y-0.5">
+                <span className="font-bold text-slate-700 dark:text-slate-350 block">Chatbot:</span>
+                <p className="italic leading-normal pl-2 border-l border-slate-200 dark:border-slate-800">{organismo.chatbotResena}</p>
               </div>
             )}
           </div>
         )}
+
       </div>
 
       {/* Action / Redirection Links */}

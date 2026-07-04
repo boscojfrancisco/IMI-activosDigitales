@@ -35,8 +35,10 @@ export interface Organismo {
   // Reseñas y Metadatos agregados
   resenaSiif?: string;
   resenaFirma?: string;
+  resenaIa?: string;
   chatbotNombre?: string;
   chatbotResena?: string;
+
 
   capacitacion: string;
   capacitacionDigital: string;

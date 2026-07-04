@@ -49,8 +49,10 @@ export const organismos = pgTable('organismos', {
   // Reseñas y Metadatos agregados
   resenaSiif: text('resena_siif'),
   resenaFirma: text('resena_firma'),
+  resenaIa: text('resena_ia'),
   chatbotNombre: text('chatbot_nombre'),
   chatbotResena: text('chatbot_resena'),
+
   
   fuente: text('fuente'),
   nivelConfianza: text('nivel_confianza').default('Bajo'),

@@ -523,71 +523,70 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved }: Orga
                   )}
                 </div>
 
-                {/* Usa IA y Chatbot */}
-                <div className="space-y-3 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Switch IA */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tienen IA en sus procesos</span>
-                      <button
-                        type="button"
-                        onClick={() => handleChange('usaIA', !formData.usaIA)}
-                        className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          formData.usaIA ? 'bg-emerald-500' : 'bg-rose-500'
+                {/* Tienen IA en sus procesos */}
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tienen IA en sus procesos</span>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('usaIA', !formData.usaIA)}
+                      className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        formData.usaIA ? 'bg-emerald-500' : 'bg-rose-500'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                          formData.usaIA ? 'translate-x-5.5' : 'translate-x-0'
                         }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
-                            formData.usaIA ? 'translate-x-5.5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* Switch Chatbot */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tiene Chatbot</span>
-                      <button
-                        type="button"
-                        onClick={() => handleChange('chatbot', !formData.chatbot)}
-                        className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                          formData.chatbot ? 'bg-emerald-500' : 'bg-rose-500'
-                        }`}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
-                            formData.chatbot ? 'translate-x-5.5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
+                      />
+                    </button>
                   </div>
-
-                  {(formData.chatbot || formData.usaIA) && (
-                    <div className="space-y-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">NOMBRE DEL CHATBOT / SISTEMA IA</label>
-                        <input
-                          type="text"
-                          placeholder="Ej: Chatbot Corrientes, Asistente de Trámites..."
-                          value={formData.chatbotNombre || ''}
-                          onChange={(e) => handleChange('chatbotNombre', e.target.value)}
-                          className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">RESEÑA DEL CHATBOT / PROCESO DE IA</label>
-                        <textarea
-                          rows={2}
-                          placeholder="Breve reseña sobre cómo asiste al ciudadano o automatiza procesos..."
-                          value={formData.chatbotResena || ''}
-                          onChange={(e) => handleChange('chatbotResena', e.target.value)}
-                          className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                      </div>
+                  {formData.usaIA && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">RESEÑA DE IA EN SUS PROCESOS</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Escribí una reseña sobre el Uso de Inteligencia Artificial en este organismo..."
+                        value={formData.resenaIa || ''}
+                        onChange={(e) => handleChange('resenaIa', e.target.value)}
+                        className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
                     </div>
                   )}
                 </div>
+
+                {/* Tiene Chatbot */}
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tiene Chatbot</span>
+                    <button
+                      type="button"
+                      onClick={() => handleChange('chatbot', !formData.chatbot)}
+                      className={`relative inline-flex h-6.5 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        formData.chatbot ? 'bg-emerald-500' : 'bg-rose-500'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5.5 w-5.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out ${
+                          formData.chatbot ? 'translate-x-5.5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {formData.chatbot && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                      <label className="text-[11px] font-bold text-slate-450 dark:text-slate-500 block mb-1">RESEÑA DEL CHATBOT</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Escribí una reseña sobre el chatbot de este organismo..."
+                        value={formData.chatbotResena || ''}
+                        onChange={(e) => handleChange('chatbotResena', e.target.value)}
+                        className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
+
 
 
               </div>
