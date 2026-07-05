@@ -58,3 +58,20 @@ Para mantener la consistencia con el vocabulario del organismo, se deben usar si
 1. **Compilación de Producción**: Al modificar archivos de base de datos o APIs en `server.ts`, recordar que para el despliegue en Google Cloud se debe empaquetar el contenedor Docker y la app compilarse usando `npm run build`.
 2. **Historial de Cambios**: Cualquier modificación a los datos de un organismo debe guardar un log histórico en la tabla `indicadores_history` conteniendo el snapshot JSON del estado del organismo.
 3. **No usar SQLite en producción**: El archivo `sqlite.db` local es puramente de desarrollo o backup. La fuente de verdad online es la base de datos PostgreSQL.
+
+---
+
+## 🚀 Protocolo y Formato de Despliegue (Deploy)
+
+Cada vez que se finalice un despliegue (deploy) de cambios, se debe presentar la información en una tabla de resumen con el siguiente formato exacto:
+
+| Entorno | URL | Estado |
+|---|---|---|
+| **Google Cloud** ☁️ | URL del servicio | ✅ / ⏳ |
+| **GitHub** 🐙 | URL del repo | ✅ / ⏳ |
+| **Local** 💻 | http://127.0.0.1:PUERTO | ✅ / ⏳ |
+
+### Reglas obligatorias de Deploy:
+1. **Cache-Busting en archivos estáticos**: Si se actualizan archivos estáticos (CSS/JS) en el cliente, agregar un sufijo de cache-busting (?v=FECHA) en las referencias del HTML para evitar problemas de caché del navegador.
+2. **Deploys en paralelo**: Realizar las 3 tareas de despliegue (Local, GitHub y Google Cloud) en paralelo siempre que sea posible.
+3. **Notificación de estado**: Informar al usuario a medida que cada entorno esté listo.
