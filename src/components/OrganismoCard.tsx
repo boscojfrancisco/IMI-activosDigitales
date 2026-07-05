@@ -33,25 +33,25 @@ export function getMaturityGrade(org: Organismo): number {
     return v === 'tiene' || v === 'si' || v === 'sí' || v === 'hizo';
   };
   
-  // 1. Identidad y Presencia Web (15%)
+  // 1. Eje 3: Identidad Web (15%)
   if (org.tieneWeb) score += 10;
   if (org.tieneWebPropia) score += 5;
 
-  // 2. Servicios al Ciudadano (45%)
+  // 2. Eje 1: Servicios Ciudadanos (45%)
   if (isYes(org.guiaTramites)) score += 10;
   if (isYes(org.tramitesOnline)) score += 20;
   if (isYes(org.turnosOnline)) score += 5;
   if (isYes(org.seguimientoTramites)) score += 5;
   if (isYes(org.atencionDigital)) score += 5;
 
-  // 3. Gestión y Despapelización Interna (30%)
+  // 3. Eje 2: Eficiencia Interna (30%)
   if (isYes(org.expedienteDigital)) score += 10;
   if (isYes(org.firmaDigital)) score += 10;
   if (isYes(org.tieneDoco)) score += 5;
-  if (isYes(org.analisisProcesos)) score += 5;
-
-  // 4. Sistemas y Modernización (10%)
   if (isYes(org.usaSiif)) score += 5;
+
+  // 4. Eje 4: Innovación y Procesos (10%)
+  if (isYes(org.analisisProcesos)) score += 5;
   if (org.chatbot || org.usaIA) score += 5;
 
   return score;
