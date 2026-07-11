@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Organismo, FilterState, Stats } from './types';
 import { fetchOrganismos } from './utils/dataParser';
+import { apiUrl } from './lib/api';
 import StatsGrid from './components/StatsGrid';
 import FilterSidebar from './components/FilterSidebar';
 import OrganismoCard, { getMaturityGrade } from './components/OrganismoCard';
@@ -96,7 +97,7 @@ export default function App() {
   useEffect(() => {
     const savedToken = localStorage.getItem('imi_auth_token');
     if (savedToken) {
-      fetch('/api/auth/me', {
+      fetch(apiUrl('/api/auth/me'), {
         headers: { 'Authorization': `Bearer ${savedToken}` }
       })
       .then(res => {

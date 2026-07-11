@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Organismo } from '../types';
 import { X, Save, History, Loader2, ArrowRight } from 'lucide-react';
+import { apiUrl } from '../lib/api';
 
 interface OrganismoEditModalProps {
   organismo: Organismo;
@@ -19,7 +20,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
   const loadHistory = async () => {
     setLoadingHistory(true);
     try {
-      const res = await fetch(`/api/organismos/${organismo.id}/history`, {
+      const res = await fetch(apiUrl(`/api/organismos/${organismo.id}/history`), {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (res.ok) {
@@ -48,7 +49,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
     if (!organismo.id) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/organismos/${organismo.id}`, {
+      const res = await fetch(apiUrl(`/api/organismos/${organismo.id}`), {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

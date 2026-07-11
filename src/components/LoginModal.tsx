@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, User, Lock, LogIn, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { apiUrl } from '../lib/api';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -45,7 +46,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
     try {
       if (isRegister) {
         // Register flow
-        const res = await fetch('/api/auth/register', {
+        const res = await fetch(apiUrl('/api/auth/register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
@@ -60,7 +61,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }: LoginMod
         setConfirmPassword('');
       } else {
         // Login flow
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(apiUrl('/api/auth/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),

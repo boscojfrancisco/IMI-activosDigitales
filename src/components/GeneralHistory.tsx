@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, History, ArrowRight, User, Check, X, RefreshCw, Search } from 'lucide-react';
+import { apiUrl } from '../lib/api';
 
 interface HistoryItem {
   id: number;
@@ -21,7 +22,7 @@ export default function GeneralHistory({ token }: GeneralHistoryProps) {
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch('/api/history', {
+      const res = await fetch(apiUrl('/api/history'), {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (res.ok) {

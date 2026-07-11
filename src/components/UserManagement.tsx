@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Shield, Edit2, UserCheck, UserX, Search, Clock, Key, Plus, Trash2, X } from 'lucide-react';
+import { apiUrl } from '../lib/api';
 
 interface UserRecord {
   idUsuario: number;
@@ -33,7 +34,7 @@ export default function UserManagement({ token, currentUserId }: UserManagementP
     setLoading(true);
     setError('');
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await fetch(apiUrl('/api/admin/users'), {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -53,7 +54,7 @@ export default function UserManagement({ token, currentUserId }: UserManagementP
   const handleUpdateRole = async (userId: number, newRole: string) => {
     setUpdatingId(userId);
     try {
-      const res = await fetch(`/api/admin/users/${userId}/role`, {
+      const res = await fetch(apiUrl(`/api/admin/users/${userId}/role`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -82,7 +83,7 @@ export default function UserManagement({ token, currentUserId }: UserManagementP
     setUpdatingId(userId);
     const nextStatus = !currentStatus;
     try {
-      const res = await fetch(`/api/admin/users/${userId}/status`, {
+      const res = await fetch(apiUrl(`/api/admin/users/${userId}/status`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -111,7 +112,7 @@ export default function UserManagement({ token, currentUserId }: UserManagementP
     setCreating(true);
     setCreateError('');
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await fetch(apiUrl('/api/admin/users'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -150,7 +151,7 @@ export default function UserManagement({ token, currentUserId }: UserManagementP
     }
     setUpdatingId(userId);
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
+      const res = await fetch(apiUrl(`/api/admin/users/${userId}`), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
