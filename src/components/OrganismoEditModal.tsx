@@ -6,9 +6,10 @@ interface OrganismoEditModalProps {
   organismo: Organismo;
   onClose: () => void;
   onSaved: (updated: Organismo) => void;
+  token?: string | null;
 }
 
-export default function OrganismoEditModal({ organismo, onClose, onSaved }: OrganismoEditModalProps) {
+export default function OrganismoEditModal({ organismo, onClose, onSaved, token }: OrganismoEditModalProps) {
   const [formData, setFormData] = useState<Partial<Organismo>>(organismo);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'edit' | 'history'>('edit');
@@ -18,7 +19,9 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved }: Orga
   const loadHistory = async () => {
     setLoadingHistory(true);
     try {
-      const res = await fetch(`/api/organismos/${organismo.id}/history`);
+      const res = await fetch(`/api/organismos/${organismo.id}/history`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
         setHistoryDocs(data);
@@ -47,7 +50,10 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved }: Orga
     try {
       const res = await fetch(`/api/organismos/${organismo.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(formData)
       });
       if (!res.ok) throw new Error('Failed to update');

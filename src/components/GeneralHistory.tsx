@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, History, ArrowRight, User, Check, X, RefreshCw } from 'lucide-react';
+import { Loader2, History, ArrowRight, User, Check, X, RefreshCw, Search } from 'lucide-react';
 
 interface HistoryItem {
   id: number;
@@ -10,13 +10,20 @@ interface HistoryItem {
   createdAt: string;
 }
 
-export default function GeneralHistory() {
+interface GeneralHistoryProps {
+  token?: string | null;
+}
+
+export default function GeneralHistory({ token }: GeneralHistoryProps) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch('/api/history');
+      const res = await fetch('/api/history', {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (res.ok) {
         const data = await res.json();
         setHistory(data);
@@ -178,9 +185,14 @@ export default function GeneralHistory() {
     );
   }
 
+  const filteredHistory = history.filter(item => 
+    item.organismoNombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.userId || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
-      <div className="flex justify-between items-center">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-5 text-left">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 className="font-display font-bold text-slate-800 dark:text-slate-100 text-lg flex items-center gap-2">
             <History className="h-5 w-5 text-blue-500" />
@@ -190,22 +202,41 @@ export default function GeneralHistory() {
             Auditoría interactiva en tiempo real de los cambios y digitalización del sector público.
           </p>
         </div>
-        <button
-          onClick={fetchHistory}
-          className="p-2 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-          title="Actualizar historial"
-        >
-          <RefreshCw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Search bar */}
+          <div className="relative w-full sm:w-64">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <Search className="h-4 w-4" />
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar por organismo o usuario..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 text-xs text-slate-700 dark:text-slate-350 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition"
+            />
+          </div>
+          <button
+            onClick={fetchHistory}
+            className="p-2 text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm transition cursor-pointer flex items-center justify-center"
+            title="Actualizar historial"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {history.length === 0 ? (
         <div className="text-center py-12 text-slate-400 dark:text-slate-500 text-sm">
           No hay registros de cambios en la base de datos todavía.
         </div>
+      ) : filteredHistory.length === 0 ? (
+        <div className="text-center py-12 text-slate-400 dark:text-slate-500 text-xs italic">
+          No se encontraron registros de cambios que coincidan con tu búsqueda.
+        </div>
       ) : (
         <div className="relative border-l border-slate-200 dark:border-slate-800 ml-4 space-y-6 py-2">
-          {history.map((item, idx) => (
+          {filteredHistory.map((item, idx) => (
             <div key={item.id} className="relative pl-6">
               {/* Timeline marker */}
               <div className="absolute -left-2 top-1.5 w-4 h-4 rounded-full bg-blue-100 dark:bg-blue-950 border-2 border-blue-500 flex items-center justify-center">
@@ -230,7 +261,7 @@ export default function GeneralHistory() {
                   </span>
                 </div>
 
-                {renderSnapshotDetails(item, idx)}
+                {renderSnapshotDetails(item, history.indexOf(item))}
               </div>
             </div>
           ))}

@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, serial, text, boolean, integer, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, boolean, integer, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 // Representa un organismo/institución en PostgreSQL
 export const organismos = pgTable('organismos', {
@@ -84,4 +84,13 @@ export const historyRelations = relations(indicadoresHistory, ({ one }) => ({
     references: [organismos.id],
   }),
 }));
+
+export const usuarios = pgTable('usuarios_imi', {
+  idUsuario: serial('id_usuario').primaryKey(),
+  username: varchar('username', { length: 50 }).notNull().unique(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  tableroAcceso: varchar('tablero_acceso', { length: 100 }).default('reader').notNull(), // 'admin' | 'editor' | 'reader'
+  activo: boolean('activo').default(true).notNull(),
+  fechaCreacion: timestamp('fecha_creacion', { withTimezone: true }).defaultNow(),
+});
 

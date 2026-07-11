@@ -7,9 +7,10 @@ interface StatsGridProps {
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
   onResetFilters: () => void;
+  staleCount: number;
 }
 
-export default function StatsGrid({ stats, filters, setFilters, onResetFilters }: StatsGridProps) {
+export default function StatsGrid({ stats, filters, setFilters, onResetFilters, staleCount }: StatsGridProps) {
   // Check if any filter is active currently
   const isAnyFilterActive = 
     filters.tipo !== 'ALL' || 
@@ -20,7 +21,8 @@ export default function StatsGrid({ stats, filters, setFilters, onResetFilters }
     filters.tramitesOnline || 
     filters.turnosOnline || 
     filters.expedienteDigital || 
-    filters.usaIAOrChatbot;
+    filters.usaIAOrChatbot ||
+    filters.staleOnly;
 
   const cards = [
     {
@@ -134,6 +136,24 @@ export default function StatsGrid({ stats, filters, setFilters, onResetFilters }
 
   return (
     <div id="statsGrid" className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
+      {staleCount > 0 && (
+        <div className="col-span-2 md:col-span-4 lg:col-span-8 flex items-center justify-between p-3.5 bg-amber-50 dark:bg-amber-955/20 border border-amber-250 dark:border-amber-900/30 rounded-2xl text-xs text-amber-800 dark:text-amber-300 shadow-sm animate-pulse-subtle">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+            <span>
+              Hay <strong>{staleCount}</strong> organismo(s) con datos sin actualizar por más de 90 días (Revisión Pendiente).
+            </span>
+          </div>
+          <button
+            onClick={() => setFilters(prev => ({ ...prev, staleOnly: !prev.staleOnly }))}
+            className={`px-3 py-1.5 bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-800 text-[11px] font-bold rounded-lg transition cursor-pointer select-none border border-amber-300 dark:border-amber-800 flex items-center gap-1.5 ${
+              filters.staleOnly ? 'ring-2 ring-amber-500/30 bg-amber-200 dark:bg-amber-800' : ''
+            }`}
+          >
+            {filters.staleOnly ? 'Mostrar todos' : 'Filtrar desactualizados'}
+          </button>
+        </div>
+      )}
       {cards.map((card, i) => {
         const isClickable = card.filterKey !== 'clear' || isAnyFilterActive;
         const outerClasses = card.isActive

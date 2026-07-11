@@ -51,6 +51,7 @@ export interface Organismo {
 
   
   dateActualizacion?: string; // Kept for backward compatibility
+  updatedAt?: string;
 }
 
 export interface Stats {
@@ -83,4 +84,6 @@ export interface FilterState {
   analisisProcesos: boolean;
   tieneDoco: boolean;
   usaSiif: boolean;
+  staleOnly: boolean;
 }
+

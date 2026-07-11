@@ -8,6 +8,9 @@ import MatrixTable from './components/MatrixTable';
 import DigitalMaturityChart from './components/DigitalMaturityChart';
 import OrganismoEditModal from './components/OrganismoEditModal';
 import GeneralHistory from './components/GeneralHistory';
+import ComparatorModal from './components/ComparatorModal';
+import LoginModal from './components/LoginModal';
+import UserManagement from './components/UserManagement';
 import { AnimatePresence, motion } from 'motion/react';
 import { 
   Building2, 
@@ -21,7 +24,13 @@ import {
   Sparkle,
   Github,
   Clock,
-  ArrowRightCircle
+  ArrowRightCircle,
+  Award,
+  LogIn,
+  LogOut,
+  User,
+  Users,
+  FileSpreadsheet
 } from 'lucide-react';
 
 const INITIAL_FILTERS: FilterState = {
@@ -37,7 +46,8 @@ const INITIAL_FILTERS: FilterState = {
   firmaDigital: false,
   analisisProcesos: false,
   tieneDoco: false,
-  usaSiif: false
+  usaSiif: false,
+  staleOnly: false
 };
 
 export default function App() {
@@ -47,10 +57,17 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   
   // UI views and themes
-  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history'>('matrix');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history' | 'users'>('matrix');
+  
+  // Auth state
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<{ idUsuario: number; username: string; tableroAcceso: string } | null>(null);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [sortBy, setSortBy] = useState<string>('nombre_asc');
   const [editingOrg, setEditingOrg] = useState<Organismo | null>(null);
+  const [comparedOrgIds, setComparedOrgIds] = useState<number[]>([]);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isDark, setIsDark] = useState<boolean>(() => {
     // Check local storage or media preferences
     if (typeof window !== 'undefined') {
@@ -74,6 +91,30 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [isDark]);
+
+  // Verificar sesión JWT activa al cargar
+  useEffect(() => {
+    const savedToken = localStorage.getItem('imi_auth_token');
+    if (savedToken) {
+      fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${savedToken}` }
+      })
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Sesión vencida');
+      })
+      .then(userData => {
+        setToken(savedToken);
+        setUser(userData);
+      })
+      .catch(() => {
+        localStorage.removeItem('imi_auth_token');
+        localStorage.removeItem('imi_auth_user');
+        setToken(null);
+        setUser(null);
+      });
+    }
+  }, []);
 
   // Live timer tick
   useEffect(() => {
@@ -177,6 +218,14 @@ export default function App() {
     };
   }, [baseFilteredList]);
 
+  const isStale = (org: Organismo) => {
+    if (!org.updatedAt) return true;
+    const date = new Date(org.updatedAt);
+    const diffTime = Math.abs(new Date().getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 90;
+  };
+
   // Process and filter data for the active list
   const filteredAndSortedList = useMemo(() => {
     let result = [...baseFilteredList];
@@ -215,6 +264,9 @@ export default function App() {
     if (filters.usaSiif) {
       result = result.filter(org => org.usaSiif?.toLowerCase().trim() === 'tiene' || org.usaSiif?.toLowerCase().trim() === 'si' || org.usaSiif?.toLowerCase().trim() === 'sí');
     }
+    if (filters.staleOnly) {
+      result = result.filter(isStale);
+    }
 
     // Sort algorithms
     result.sort((a, b) => {
@@ -250,6 +302,56 @@ export default function App() {
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
     downloadAnchor.setAttribute("download", `digitalizacion_corrientes_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleExportDataCsv = () => {
+    const headers = [
+      'Organismo', 'Tipo', 'IMDP (%)',
+      'Web Oficial', 'Enlace Web', 'Enlace Web Gov',
+      'Web Propia', 'Enlace Web Propia',
+      'Guia de Tramites', 'Enlace Guia', 'Cant. Tramites Guia',
+      'Tramites Online', 'Enlace Tramites Online', 'Cant. Tramites Online',
+      'Iniciar Tramites Online', 'Enlace Iniciar Tramites Online', 'Cant. Iniciar Tramites Online',
+      'Turnos Online', 'Enlace Turnos Online',
+      'Seguimiento Tramites', 'Atencion Digital',
+      'Expediente Digital', 'Tienen Firma Digital', 'Contratado Doco', 'Uso de SiiF',
+      'Analisis de Procesos con Gcia. Innovacion', 'Tienen IA en sus procesos', 'Tiene Chatbot',
+      'Ultima Actualizacion', 'Fuente'
+    ];
+
+    const rows = filteredAndSortedList.map(org => {
+      const score = getMaturityGrade(org);
+      return [
+        org.nombre, org.tipo || 'Organismo', `${score}%`,
+        org.tieneWeb ? 'SÍ' : 'NO', org.enlaceWeb || '', org.enlaceWebGov || '',
+        org.tieneWebPropia ? 'SÍ' : 'NO', org.enlaceWebPropia || '',
+        org.guiaTramites || 'No', org.enlaceGuia || '', org.qTramitesGuia || 0,
+        org.tramitesOnline || 'No', org.enlaceTramitesOnline || '', org.qTramitesOnline || 0,
+        org.iniciarTramOnline || 'No', org.enlaceIniciarTramOnline || '', org.qIniciarTramOnline || 0,
+        org.turnosOnline || 'No', org.enlaceTurnosOnline || '',
+        org.seguimientoTramites || 'No', org.atencionDigital || 'No',
+        org.expedienteDigital || 'No', org.firmaDigital || 'No', org.tieneDoco || 'No', org.usaSiif || 'No',
+        org.analisisProcesos || 'No', org.usaIA ? 'SÍ' : 'NO', org.chatbot ? 'SÍ' : 'NO',
+        org.updatedAt ? new Date(org.updatedAt).toLocaleDateString('es-AR') : 'S/D', org.fuente || 'Sin Datos'
+      ];
+    });
+
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(row => row.map(val => {
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      }).join(';'))
+    ].join('\n');
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", url);
+    downloadAnchor.setAttribute("download", `digitalizacion_corrientes_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -316,15 +418,59 @@ export default function App() {
               <ArrowRightCircle className="h-4 w-4 rotate-90 text-blue-500" />
             </button>
 
+            {/* Export CSV Button */}
+            <button
+              onClick={handleExportDataCsv}
+              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer flex items-center justify-center"
+              title="Exportar datos a Excel / CSV"
+              aria-label="Exportar Excel"
+            >
+              <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
+            </button>
+
             {/* Dark Mode toggle */}
             <button
               onClick={() => setIsDark(!isDark)}
-              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer"
+              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer mr-1"
               title="Cambiar tema visual"
               aria-label="Toggle dark mode"
             >
               {isDark ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4 text-indigo-500" />}
             </button>
+
+            {/* Auth Section */}
+            {user ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/30 rounded-xl text-xs shadow-sm">
+                  <User className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">{user.username}</span>
+                  <span className="text-[9px] uppercase font-extrabold bg-blue-100 dark:bg-blue-905/50 text-blue-700 dark:text-blue-300 px-1.5 py-0.2 rounded-full">
+                    {user.tableroAcceso === 'admin' ? 'Admin' : user.tableroAcceso === 'editor' ? 'Editor' : 'Lector'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('imi_auth_token');
+                    localStorage.removeItem('imi_auth_user');
+                    setToken(null);
+                    setUser(null);
+                    setActiveTab('matrix');
+                  }}
+                  className="p-2.5 rounded-xl bg-white hover:bg-rose-50 hover:text-rose-600 dark:bg-slate-900 dark:hover:bg-rose-955/20 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 transition shadow-sm cursor-pointer flex items-center justify-center"
+                  title="Cerrar sesión"
+                >
+                  <LogOut className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setIsLoginOpen(true)}
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/10 cursor-pointer transition flex items-center gap-1.5"
+              >
+                <LogIn className="h-4 w-4" />
+                <span>Ingresar</span>
+              </button>
+            )}
           </div>
 
         </header>
@@ -365,6 +511,7 @@ export default function App() {
               filters={filters}
               setFilters={setFilters}
               onResetFilters={handleResetFilters}
+              staleCount={organismos.filter(isStale).length}
             />
 
             {/* Dashboard Workspace */}
@@ -396,15 +543,28 @@ export default function App() {
                       <BarChart3 className="h-3.5 w-3.5" />
                       Métricas
                     </button>
-                    <button
-                      onClick={() => setActiveTab('history')}
-                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
-                        activeTab === 'history' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      <Clock className="h-3.5 w-3.5" />
-                      Historial
-                    </button>
+                    {(user?.tableroAcceso === 'admin' || user?.tableroAcceso === 'editor') && (
+                      <button
+                        onClick={() => setActiveTab('history')}
+                        className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
+                          activeTab === 'history' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        <Clock className="h-3.5 w-3.5" />
+                        Historial
+                      </button>
+                    )}
+                    {user?.tableroAcceso === 'admin' && (
+                      <button
+                        onClick={() => setActiveTab('users')}
+                        className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
+                          activeTab === 'users' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                        }`}
+                      >
+                        <Users className="h-3.5 w-3.5" />
+                        Usuarios
+                      </button>
+                    )}
                   </div>
 
                   {/* Results Count Summary */}
@@ -424,7 +584,12 @@ export default function App() {
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
                       >
-                        <MatrixTable organismos={filteredAndSortedList} onEdit={setEditingOrg} />
+                        <MatrixTable
+                          organismos={filteredAndSortedList}
+                          onEdit={(user?.tableroAcceso === 'admin' || user?.tableroAcceso === 'editor') ? setEditingOrg : undefined}
+                          comparedOrgIds={comparedOrgIds}
+                          onToggleCompare={(id) => setComparedOrgIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 3 ? [...prev, id] : prev)}
+                        />
                       </motion.div>
                     )}
 
@@ -440,7 +605,7 @@ export default function App() {
                       </motion.div>
                     )}
 
-                    {activeTab === 'history' && (
+                    {activeTab === 'history' && (user?.tableroAcceso === 'admin' || user?.tableroAcceso === 'editor') && (
                       <motion.div
                         key="history-view"
                         initial={{ opacity: 0, y: 10 }}
@@ -448,7 +613,19 @@ export default function App() {
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
                       >
-                        <GeneralHistory />
+                        <GeneralHistory token={token} />
+                      </motion.div>
+                    )}
+
+                    {activeTab === 'users' && user?.tableroAcceso === 'admin' && (
+                      <motion.div
+                        key="users-view"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <UserManagement token={token || ''} currentUserId={user?.idUsuario} />
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -464,6 +641,34 @@ export default function App() {
 
       </div>
 
+      {comparedOrgIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-200 dark:border-slate-800 shadow-xl rounded-2xl px-6 py-4 flex items-center gap-4.5 animate-bounce-subtle animate-fadeIn">
+          <div className="text-xs">
+            <span className="font-bold text-slate-800 dark:text-slate-100 block font-display">
+              Comparador Activado
+            </span>
+            <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px]">
+              {comparedOrgIds.length} de 3 seleccionados
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setComparedOrgIds([])}
+              className="px-3 py-1.5 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold rounded-xl cursor-pointer transition"
+            >
+              Limpiar
+            </button>
+            <button
+              onClick={() => setIsCompareOpen(true)}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow shadow-blue-500/20 cursor-pointer transition flex items-center gap-1.5"
+            >
+              <Award className="h-3.5 w-3.5" />
+              Comparar ahora
+            </button>
+          </div>
+        </div>
+      )}
+
       <AnimatePresence>
         {editingOrg && (
           <OrganismoEditModal
@@ -473,9 +678,30 @@ export default function App() {
               setOrganismos(prev => prev.map(o => o.id === updated.id ? updated : o));
               setEditingOrg(null);
             }}
+            token={token}
           />
         )}
       </AnimatePresence>
+
+      {isCompareOpen && (
+        <ComparatorModal
+          organismos={organismos.filter(o => comparedOrgIds.includes(o.id))}
+          onClose={() => setIsCompareOpen(false)}
+        />
+      )}
+
+      {isLoginOpen && (
+        <LoginModal
+          isOpen={isLoginOpen}
+          onClose={() => setIsLoginOpen(false)}
+          onLoginSuccess={(jwtToken, userData) => {
+            setToken(jwtToken);
+            setUser(userData);
+            localStorage.setItem('imi_auth_token', jwtToken);
+            localStorage.setItem('imi_auth_user', JSON.stringify(userData));
+          }}
+        />
+      )}
     </div>
   );
 }

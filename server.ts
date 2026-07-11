@@ -1,16 +1,33 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 import { db } from './src/db/index.ts';
-import { organismos, indicadoresHistory } from './src/db/schema.ts';
+import { organismos, indicadoresHistory, usuarios } from './src/db/schema.ts';
 import { eq } from 'drizzle-orm';
-import { requireAuth, AuthRequest } from './src/middleware/auth.ts';
+import { requireAuth, checkRole, AuthRequest } from './src/middleware/auth.ts';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(express.json());
+
+const JWT_SECRET = process.env.JWT_SECRET || 'imi-activos-digitales-secret-key-2026';
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, storedHash: string): boolean {
+  const [salt, hash] = storedHash.split(':');
+  if (!salt || !hash) return false;
+  const verifyHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
+  return hash === verifyHash;
+}
 
 async function seedDatabaseIfEmpty() {
   try {
@@ -146,6 +163,217 @@ async function seedDatabaseIfEmpty() {
   }
 }
 
+// --- RUTAS DE AUTENTICACIÓN Y ROLES DE USUARIO ---
+
+// Registro de usuarios
+app.post('/api/auth/register', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+  }
+
+  try {
+    // Comprobar si el usuario ya existe
+    const existing = await db.select()
+      .from(usuarios)
+      .where(eq(usuarios.username, username))
+      .limit(1);
+
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'El nombre de usuario ya está registrado' });
+    }
+
+    // Contar cantidad de usuarios actuales para ver si es el primero
+    const allUsers = await db.select().from(usuarios);
+    const isFirstUser = allUsers.length === 0;
+    const role = isFirstUser ? 'admin' : 'reader';
+
+    const passwordHash = hashPassword(password);
+
+    await db.insert(usuarios).values({
+      username,
+      passwordHash,
+      tableroAcceso: role,
+      activo: true
+    });
+
+    return res.json({ success: true, message: `Usuario registrado exitosamente con rol ${role}` });
+  } catch (err: any) {
+    console.error('Error al registrar usuario:', err);
+    return res.status(500).json({ error: err.message || 'Error interno del servidor' });
+  }
+});
+
+// Login de usuarios
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+  }
+
+  try {
+    const userRecords = await db.select()
+      .from(usuarios)
+      .where(eq(usuarios.username, username))
+      .limit(1);
+
+    if (userRecords.length === 0) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
+
+    const user = userRecords[0];
+
+    if (!user.activo) {
+      return res.status(403).json({ error: 'La cuenta del usuario está desactivada' });
+    }
+
+    const isValid = verifyPassword(password, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
+
+    // Generar Token JWT
+    const token = jwt.sign(
+      { idUsuario: user.idUsuario, username: user.username, tableroAcceso: user.tableroAcceso },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    return res.json({
+      token,
+      user: {
+        idUsuario: user.idUsuario,
+        username: user.username,
+        tableroAcceso: user.tableroAcceso
+      }
+    });
+  } catch (err: any) {
+    console.error('Error al iniciar sesión:', err);
+    return res.status(500).json({ error: err.message || 'Error interno del servidor' });
+  }
+});
+
+// Obtener datos del usuario actual autenticado
+app.get('/api/auth/me', requireAuth, (req: AuthRequest, res) => {
+  return res.json(req.user);
+});
+
+// Listar todos los usuarios (solo Admin)
+app.get('/api/admin/users', requireAuth, checkRole(['admin']), async (req, res) => {
+  try {
+    const list = await db.select({
+      idUsuario: usuarios.idUsuario,
+      username: usuarios.username,
+      tableroAcceso: usuarios.tableroAcceso,
+      activo: usuarios.activo,
+      fechaCreacion: usuarios.fechaCreacion
+    }).from(usuarios);
+    
+    return res.json(list);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Modificar rol de un usuario (solo Admin)
+app.put('/api/admin/users/:id/role', requireAuth, checkRole(['admin']), async (req, res) => {
+  const { id } = req.params;
+  const { tableroAcceso } = req.body;
+
+  if (!['admin', 'editor', 'reader'].includes(tableroAcceso)) {
+    return res.status(400).json({ error: 'Rol inválido' });
+  }
+
+  try {
+    await db.update(usuarios)
+      .set({ tableroAcceso })
+      .where(eq(usuarios.idUsuario, Number(id)));
+
+    return res.json({ success: true, message: 'Rol de usuario actualizado' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Alternar estado de un usuario (solo Admin)
+app.put('/api/admin/users/:id/status', requireAuth, checkRole(['admin']), async (req, res) => {
+  const { id } = req.params;
+  const { activo } = req.body;
+
+  if (typeof activo !== 'boolean') {
+    return res.status(400).json({ error: 'El estado activo debe ser booleano' });
+  }
+
+  try {
+    await db.update(usuarios)
+      .set({ activo })
+      .where(eq(usuarios.idUsuario, Number(id)));
+
+    return res.json({ success: true, message: 'Estado del usuario actualizado' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Crear usuario desde panel de administración (solo Admin)
+app.post('/api/admin/users', requireAuth, checkRole(['admin']), async (req, res) => {
+  const { username, password, role } = req.body;
+
+  if (!username || !password || !role) {
+    return res.status(400).json({ error: 'Todos los campos son requeridos' });
+  }
+
+  if (!['admin', 'editor', 'reader'].includes(role)) {
+    return res.status(400).json({ error: 'Rol inválido' });
+  }
+
+  try {
+    const existing = await db.select()
+      .from(usuarios)
+      .where(eq(usuarios.username, username))
+      .limit(1);
+
+    if (existing.length > 0) {
+      return res.status(400).json({ error: 'El nombre de usuario ya existe' });
+    }
+
+    const passwordHash = hashPassword(password);
+
+    await db.insert(usuarios).values({
+      username,
+      passwordHash,
+      tableroAcceso: role,
+      activo: true
+    });
+
+    return res.json({ success: true, message: 'Usuario creado exitosamente' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Eliminar usuario (solo Admin)
+app.delete('/api/admin/users/:id', requireAuth, checkRole(['admin']), async (req: AuthRequest, res) => {
+  const { id } = req.params;
+  const targetId = Number(id);
+
+  // Impedir auto-eliminación
+  if (req.user && req.user.idUsuario === targetId) {
+    return res.status(400).json({ error: 'No podés eliminar tu propia cuenta' });
+  }
+
+  try {
+    await db.delete(usuarios)
+      .where(eq(usuarios.idUsuario, targetId));
+
+    return res.json({ success: true, message: 'Usuario eliminado exitosamente' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // API route to get data from Database.
 app.get('/api/organismos', async (req, res) => {
   try {
@@ -162,8 +390,8 @@ app.get('/api/organismos', async (req, res) => {
   }
 });
 
-// Update Organismo (sin autenticación para uso local)
-app.put('/api/organismos/:id', async (req, res) => {
+// Update Organismo (requiere autenticación con rol admin o editor)
+app.put('/api/organismos/:id', requireAuth, checkRole(['admin', 'editor']), async (req: AuthRequest, res) => {
   const { id } = req.params;
   const data = req.body;
 
@@ -178,33 +406,27 @@ app.put('/api/organismos/:id', async (req, res) => {
       'seguimientoTramites', 'atencionDigital', 'capacitacion', 'capacitacionDigital',
       'fuente', 'nivelConfianza', 'completitud',
       'firmaDigital', 'analisisProcesos', 'tieneDoco', 'usaSiif',
-      'resenaSiif', 'resenaFirma', 'resenaIa', 'chatbotResena'
+      'updatedAt'
     ];
-
 
     const updateFields: any = {};
     for (const key of allowedKeys) {
       if (data[key] !== undefined) {
-        updateFields[key] = data[key];
+        // Handle conversion of empty strings to null for text fields
+        if (typeof data[key] === 'string' && data[key].trim() === '') {
+          updateFields[key] = null;
+        } else {
+          updateFields[key] = data[key];
+        }
       }
     }
 
-    // Convert qTramitesGuia to number to prevent SQLite/Drizzle schema errors
-    if (updateFields.qTramitesGuia !== undefined) {
-      updateFields.qTramitesGuia = Number(updateFields.qTramitesGuia) || 0;
-    }
-
-    console.log("Updating organism ID:", id, "Fields:", updateFields);
-
-    // Always update updatedAt timestamp
     updateFields.updatedAt = new Date();
 
     const updatedResult = await db.update(organismos)
       .set(updateFields)
       .where(eq(organismos.id, Number(id)))
       .returning();
-
-    console.log("Updated result:", JSON.stringify(updatedResult[0]));
 
     if (updatedResult.length === 0) {
       return res.status(404).json({ error: "Organismo not found" });
@@ -214,7 +436,7 @@ app.put('/api/organismos/:id', async (req, res) => {
     try {
       await db.insert(indicadoresHistory).values({
         organismoId: Number(id),
-        userId: 'Usuario Local',
+        userId: req.user?.username || 'Usuario Desconocido',
         snapshot: JSON.stringify(updatedResult[0])
       });
       console.log("History log saved for organism:", id);
@@ -234,7 +456,7 @@ app.put('/api/organismos/:id', async (req, res) => {
 });
 
 // GET History of a single organism
-app.get('/api/organismos/:id/history', async (req, res) => {
+app.get('/api/organismos/:id/history', requireAuth, checkRole(['admin', 'editor']), async (req, res) => {
   const { id } = req.params;
   try {
     const history = await db.select()
@@ -255,7 +477,7 @@ app.get('/api/organismos/:id/history', async (req, res) => {
 });
 
 // GET general history across all organisms
-app.get('/api/history', async (req, res) => {
+app.get('/api/history', requireAuth, checkRole(['admin', 'editor']), async (req, res) => {
   try {
     const history = await db.select().from(indicadoresHistory);
     const allOrgs = await db.select().from(organismos);
