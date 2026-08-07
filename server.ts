@@ -406,6 +406,7 @@ app.put('/api/organismos/:id', requireAuth, checkRole(['admin', 'editor']), asyn
       'seguimientoTramites', 'atencionDigital', 'capacitacion', 'capacitacionDigital',
       'fuente', 'nivelConfianza', 'completitud',
       'firmaDigital', 'analisisProcesos', 'tieneDoco', 'usaSiif',
+      'tramitesMiCorrientes',
       'updatedAt'
     ];
 

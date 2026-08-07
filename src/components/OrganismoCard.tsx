@@ -17,7 +17,8 @@ import {
   FileSignature,
   GitBranch,
   ShieldCheck,
-  Coins
+  Coins,
+  Smartphone
 } from 'lucide-react';
 
 interface OrganismoCardProps {
@@ -96,7 +97,7 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
 
   const statusStyle = getMaturityColor(grade);
 
-  const renderDigitalIndicator = (label: string, value: string | boolean, icon: React.ComponentType<{ className?: string }>) => {
+  const renderDigitalIndicator = (label: string, value: string | boolean, icon: React.ComponentType<{ className?: string }>, extraText?: string) => {
     const Icon = icon;
     const isYes = typeof value === 'boolean' 
       ? value 
@@ -106,7 +107,10 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
       <div className="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/80 last:border-0">
         <div className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400">
           <Icon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-          <span>{label}</span>
+          <div className="flex flex-col">
+            <span>{label}</span>
+            {extraText && <span className="text-[9px] text-blue-500 dark:text-blue-400 font-semibold">{extraText}</span>}
+          </div>
         </div>
         {isYes ? (
           <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-full">
@@ -177,6 +181,12 @@ const OrganismoCard: React.FC<OrganismoCardProps> = ({ organismo, onEdit }) => {
           {renderDigitalIndicator('Dominio Propio (Independiente)', organismo.tieneWebPropia, Sparkles)}
           {renderDigitalIndicator('Guía de Trámites', organismo.guiaTramites, BookOpen)}
           {renderDigitalIndicator('Tramites Online', organismo.tramitesOnline, Laptop)}
+          {renderDigitalIndicator(
+            'Trámites en MI Corrientes', 
+            !!(organismo.tramitesMiCorrientes && organismo.tramitesMiCorrientes !== 'No'), 
+            Smartphone, 
+            organismo.tramitesMiCorrientes && organismo.tramitesMiCorrientes !== 'No' ? organismo.tramitesMiCorrientes : undefined
+          )}
           {renderDigitalIndicator('Turnos por Turnero', organismo.turnosOnline, CalendarCheck)}
           {renderDigitalIndicator('Expediente Digital', organismo.expedienteDigital, FileText)}
           {renderDigitalIndicator('Tienen Firma Digital', organismo.firmaDigital, FileSignature)}

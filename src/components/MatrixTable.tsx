@@ -362,6 +362,11 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
                 <td>-</td>
               </tr>
               <tr>
+                <td>Trámites en MI Corrientes</td>
+                <td><span class="badge ${org.tramitesMiCorrientes && org.tramitesMiCorrientes !== 'No' ? 'badge-yes' : 'badge-no'}">${org.tramitesMiCorrientes && org.tramitesMiCorrientes !== 'No' ? 'SÍ' : 'NO'}</span></td>
+                <td>${org.tramitesMiCorrientes && org.tramitesMiCorrientes !== 'No' ? org.tramitesMiCorrientes : '-'}</td>
+              </tr>
+              <tr>
                 <td>Expediente Digital</td>
                 <td><span class="badge ${isYes(org.expedienteDigital) ? 'badge-yes' : 'badge-no'}">${isYes(org.expedienteDigital) ? 'SÍ' : 'NO'}</span></td>
                 <td>-</td>
@@ -468,6 +473,37 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
       check: (o: Organismo) => o.atencionDigital?.toLowerCase().trim() === 'tiene' || o.atencionDigital?.toLowerCase().trim() === 'si' || o.atencionDigital?.toLowerCase().trim() === 'sí',
       badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
       headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
+    },
+    { 
+      label: 'Trámites en MI Corrientes', 
+      headerBg: 'bg-cyan-50/80 dark:bg-cyan-950/30',
+      check: (o: Organismo) => !!(o.tramitesMiCorrientes && o.tramitesMiCorrientes !== 'No'),
+      badgeColor: 'bg-cyan-50 dark:bg-cyan-950/20 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-800/40',
+      customRender: (o: Organismo) => {
+        const val = o.tramitesMiCorrientes;
+        if (!val || val === 'No') {
+          return (
+            <div className="flex items-center justify-center w-full min-h-[45px]">
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 px-2 py-0.5 rounded">
+                <X className="h-3 w-3 shrink-0" />
+                <span>NO</span>
+              </span>
+            </div>
+          );
+        }
+        const isAutonomous = val === 'Plataforma/sitio autónomo';
+        return (
+          <div className="flex items-center justify-center w-full min-h-[45px]">
+            <span className={`inline-flex flex-col items-center justify-center gap-0.5 text-[9px] font-bold px-2 py-1 rounded border leading-tight ${
+              isAutonomous 
+                ? 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/40' 
+                : 'bg-indigo-50 dark:bg-indigo-950/20 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/40'
+            }`}>
+              <span className="text-center">{val}</span>
+            </span>
+          </div>
+        );
+      }
     },
     // Eje 2: Eficiencia Interna
     { 
@@ -717,7 +753,22 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
 
                       {/* Celdas de Capacidades y Reseñas */}
                       {columnsDef.map((col, idx) => {
-                        const ok = col.check(org);
+                        if ((col as any).customRender) {
+                          const ok = col.check ? col.check(org) : false;
+                          return (
+                            <td
+                              key={idx}
+                              className={`p-3 border-b border-r border-slate-200 dark:border-slate-800 transition-colors ${
+                                ok
+                                  ? 'bg-emerald-500/[0.04] dark:bg-emerald-500/[0.02]'
+                                  : 'bg-rose-500/[0.02] dark:bg-rose-500/[0.01]'
+                              }`}
+                            >
+                              {(col as any).customRender(org)}
+                            </td>
+                          );
+                        }
+                        const ok = col.check ? col.check(org) : false;
                         return (
                           <td
                             key={idx}

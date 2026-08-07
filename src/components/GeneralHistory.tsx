@@ -40,13 +40,14 @@ export default function GeneralHistory({ token }: GeneralHistoryProps) {
     fetchHistory();
   }, []);
 
-  // Normaliza valores a "Si" o "No"
+  // Normaliza valores a "Si" o "No" o mantiene texto descriptivo
   const normalize = (v: any): string => {
     if (typeof v === 'boolean') return v ? 'Si' : 'No';
     if (!v) return 'No';
-    const s = v.toString().trim().toLowerCase();
-    if (s === 'si' || s === 'sí' || s === 'tiene' || s === 'hizo') return 'Si';
-    return 'No';
+    const s = v.toString().trim();
+    if (s.toLowerCase() === 'si' || s.toLowerCase() === 'sí' || s.toLowerCase() === 'tiene' || s.toLowerCase() === 'hizo') return 'Si';
+    if (s.toLowerCase() === 'no') return 'No';
+    return s;
   };
 
   const getDiffs = (currentSnap: any, prevSnap: any) => {
@@ -56,6 +57,7 @@ export default function GeneralHistory({ token }: GeneralHistoryProps) {
       { key: 'tieneWebPropia', label: 'Dominio Propio / Web Propia' },
       { key: 'guiaTramites', label: 'Guía de Trámites' },
       { key: 'tramitesOnline', label: 'Trámites Online' },
+      { key: 'tramitesMiCorrientes', label: 'Trámites en MI Corrientes' },
       { key: 'turnosOnline', label: 'Turnos Online' },
       { key: 'expedienteDigital', label: 'Expediente Digital' },
       { key: 'firmaDigital', label: 'Tienen Firma Digital' },
@@ -96,6 +98,7 @@ export default function GeneralHistory({ token }: GeneralHistoryProps) {
           { label: 'Chatbot', val: currentSnap.chatbot },
           { label: 'Guía Trámites', val: currentSnap.guiaTramites },
           { label: 'Trám. Online', val: currentSnap.tramitesOnline },
+          { label: 'Trámites en MI Corrientes', val: currentSnap.tramitesMiCorrientes },
           { label: 'Turnos Online', val: currentSnap.turnosOnline },
           { label: 'Exp. Digital', val: currentSnap.expedienteDigital },
           { label: 'Tienen Firma Digital', val: currentSnap.firmaDigital },

@@ -45,6 +45,7 @@ export const organismos = pgTable('organismos', {
   analisisProcesos: text('analisis_procesos').default('No'),
   tieneDoco: text('tiene_doco').default('No'),
   usaSiif: text('usa_siif').default('No'),
+  tramitesMiCorrientes: text('tramites_mi_corrientes').default('No'),
 
   // Reseñas y Metadatos agregados
   resenaSiif: text('resena_siif'),

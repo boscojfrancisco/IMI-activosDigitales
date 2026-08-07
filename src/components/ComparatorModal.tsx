@@ -4,7 +4,8 @@ import { getMaturityGrade } from './OrganismoCard';
 import { 
   X, Check, AlertCircle, Building2, Award, Activity, Globe, 
   BookOpen, Laptop, CalendarCheck, FileText, FileSignature, 
-  GitBranch, ShieldCheck, Coins, Bot, Sparkles, ExternalLink
+  GitBranch, ShieldCheck, Coins, Bot, Sparkles, ExternalLink,
+  Smartphone
 } from 'lucide-react';
 
 interface ComparatorModalProps {
@@ -76,6 +77,15 @@ export default function ComparatorModal({ organismos, onClose }: ComparatorModal
     { label: 'Turnos Online', key: 'turnosOnline', icon: CalendarCheck, weight: '5%', eje: 'Eje 1: Servicios Ciudadanos' },
     { label: 'Seguimiento Digital', key: 'seguimientoTramites', icon: Activity, weight: '5%', eje: 'Eje 1: Servicios Ciudadanos' },
     { label: 'Atención Digital', key: 'atencionDigital', icon: AlertCircle, weight: '5%', eje: 'Eje 1: Servicios Ciudadanos' },
+    { 
+      label: 'Trámites en MI Corrientes', 
+      key: 'tramitesMiCorrientes', 
+      icon: Smartphone, 
+      weight: '0% (Informativo)', 
+      eje: 'Eje 1: Servicios Ciudadanos', 
+      customCheck: (o: Organismo) => !!(o.tramitesMiCorrientes && o.tramitesMiCorrientes !== 'No'),
+      reviewKey: 'tramitesMiCorrientes' 
+    },
     { label: 'Expediente Digital', key: 'expedienteDigital', icon: FileText, weight: '10%', eje: 'Eje 2: Eficiencia Interna' },
     { label: 'Tienen Firma Digital', key: 'firmaDigital', icon: FileSignature, weight: '10%', eje: 'Eje 2: Eficiencia Interna', reviewKey: 'resenaFirma' },
     { label: 'Contratado Doco', key: 'tieneDoco', icon: ShieldCheck, weight: '5%', eje: 'Eje 2: Eficiencia Interna' },

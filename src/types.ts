@@ -31,6 +31,7 @@ export interface Organismo {
   analisisProcesos: string;
   tieneDoco: string;
   usaSiif: string;
+  tramitesMiCorrientes?: string;
 
   // Reseñas y Metadatos agregados
   resenaSiif?: string;

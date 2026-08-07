@@ -106,9 +106,10 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
       const normalizeVal = (v: any): string => {
         if (typeof v === 'boolean') return v ? 'Si' : 'No';
         if (!v) return 'No';
-        const s = v.toString().trim().toLowerCase();
-        if (s === 'si' || s === 'sí' || s === 'tiene' || s === 'hizo') return 'Si';
-        return 'No';
+        const s = v.toString().trim();
+        if (s.toLowerCase() === 'si' || s.toLowerCase() === 'sí' || s.toLowerCase() === 'tiene' || s.toLowerCase() === 'hizo') return 'Si';
+        if (s.toLowerCase() === 'no') return 'No';
+        return s;
       };
 
       const getDiffsList = (curr: any, prev: any) => {
@@ -118,6 +119,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
           { key: 'tieneWebPropia', label: 'Dominio Propio / Web Propia' },
           { key: 'guiaTramites', label: 'Guía de Trámites' },
           { key: 'tramitesOnline', label: 'Trámites Online' },
+          { key: 'tramitesMiCorrientes', label: 'Trámites en MI Corrientes' },
           { key: 'turnosOnline', label: 'Turnos Online' },
           { key: 'expedienteDigital', label: 'Expediente Digital' },
           { key: 'firmaDigital', label: 'Tienen Firma Digital' },
@@ -153,6 +155,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
           { label: 'Chatbot', val: currentSnap.chatbot },
           { label: 'Guía Trámites', val: currentSnap.guiaTramites },
           { label: 'Trám. Online', val: currentSnap.tramitesOnline },
+          { label: 'Trámites en MI Corrientes', val: currentSnap.tramitesMiCorrientes },
           { label: 'Turnos Online', val: currentSnap.turnosOnline },
           { label: 'Exp. Digital', val: currentSnap.expedienteDigital },
           { label: 'Tienen Firma Digital', val: currentSnap.firmaDigital },
@@ -420,6 +423,22 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Trámites en MI Corrientes */}
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col justify-between animate-fadeIn">
+                  <div className="flex flex-col gap-1.5 w-full">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-350">Trámites en MI Corrientes</label>
+                    <select
+                      value={formData.tramitesMiCorrientes || 'No'}
+                      onChange={(e) => handleChange('tramitesMiCorrientes', e.target.value)}
+                      className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer text-slate-800 dark:text-slate-200"
+                    >
+                      <option value="No">No disponible / No aplica</option>
+                      <option value="Plataforma/sitio autónomo">Plataforma/sitio autónomo</option>
+                      <option value="Digitalizado IMI">Digitalizado IMI</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Turnos Online */}

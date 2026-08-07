@@ -28,7 +28,8 @@ async function migrate() {
       'fuente TEXT',
       'nivel_confianza TEXT DEFAULT "Bajo"',
       'completitud TEXT DEFAULT "Baja"',
-      'enlace_turnos_online TEXT'
+      'enlace_turnos_online TEXT',
+      "tramites_mi_corrientes TEXT DEFAULT 'No'"
     ];
 
     for (const col of columns) {
