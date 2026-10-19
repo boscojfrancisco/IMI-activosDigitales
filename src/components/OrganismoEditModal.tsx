@@ -285,8 +285,13 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
             <form id="edit-form" onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
+                <div className="md:col-span-2 border-b border-slate-200 dark:border-slate-800 pb-2 pt-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Identidad web</h3>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Presencia oficial y dominio propio del organismo.</p>
+                </div>
+
                 {/* Sitio Web Oficial */}
-                <div className="space-y-2 col-span-1 md:col-span-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Sitio Web Oficial</span>
                     <button
@@ -315,7 +320,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
                 </div>
 
                 {/* Web Propia */}
-                <div className="space-y-2 col-span-1 md:col-span-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Dominio Propio / Web Propia</span>
                     <button
@@ -341,6 +346,11 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
                       className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-sm focus:ring-2 focus:ring-blue-500 outline-none mt-2"
                     />
                   )}
+                </div>
+
+                <div className="md:col-span-2 border-b border-slate-200 dark:border-slate-800 pb-2 pt-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Servicios ciudadanos</h3>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Trámites, turnos, guías y canales disponibles para la ciudadanía.</p>
                 </div>
 
                  {/* Guía de Trámites */}
@@ -470,13 +480,18 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
                   )}
                 </div>
 
+                <div className="md:col-span-2 border-b border-slate-200 dark:border-slate-800 pb-2 pt-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Gestión interna e innovación</h3>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Herramientas, procesos y tecnologías que fortalecen el trabajo del organismo.</p>
+                </div>
+
                 {/* Expediente Digital */}
                 {renderSwitch('Expediente Digital', formData.expedienteDigital, (checked) => 
                   handleChange('expedienteDigital', checked ? 'Si' : 'No')
                 )}
 
                  {/* Firma Digital */}
-                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tienen Firma Digital</span>
                     <button
@@ -518,7 +533,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
                 )}
 
                 {/* SiiF */}
-                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Uso de SiiF</span>
                     <button
@@ -550,7 +565,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
                 </div>
 
                 {/* Tienen IA en sus procesos */}
-                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tienen IA en sus procesos</span>
                     <button
@@ -582,7 +597,7 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
                 </div>
 
                 {/* Tiene Chatbot */}
-                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 col-span-1 md:col-span-2">
+                <div className="space-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tiene Chatbot</span>
                     <button

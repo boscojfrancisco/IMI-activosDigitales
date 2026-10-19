@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, serial, text, boolean, integer, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, boolean, integer, timestamp, varchar, jsonb } from 'drizzle-orm/pg-core';
 
 // Representa un organismo/institución en PostgreSQL
 export const organismos = pgTable('organismos', {
@@ -93,5 +93,64 @@ export const usuarios = pgTable('usuarios_imi', {
   tableroAcceso: varchar('tablero_acceso', { length: 100 }).default('reader').notNull(), // 'admin' | 'editor' | 'reader'
   activo: boolean('activo').default(true).notNull(),
   fechaCreacion: timestamp('fecha_creacion', { withTimezone: true }).defaultNow(),
+});
+
+// El índice nuevo conserva cada evaluación y los cortes cerrados como snapshots.
+export const digitalObservaciones = pgTable('digital_observaciones', {
+  id: serial('id').primaryKey(),
+  organismoId: integer('organismo_id').references(() => organismos.id, { onDelete: 'cascade' }).notNull(),
+  variableId: varchar('variable_id', { length: 2 }).notNull(),
+  nivel: integer('nivel').notNull(),
+  fuente: varchar('fuente', { length: 1 }).notNull(),
+  fechaObservacion: varchar('fecha_observacion', { length: 10 }).notNull(),
+  evidencia: text('evidencia'),
+  notas: text('notas'),
+  usuario: text('usuario').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const digitalCortes = pgTable('digital_cortes', {
+  id: serial('id').primaryKey(),
+  fecha: varchar('fecha', { length: 10 }).notNull(),
+  nombre: varchar('nombre', { length: 40 }).notNull(),
+  snapshot: jsonb('snapshot').$type<Array<{ organismoId:number; nombre:string; niveles:Record<string,number>; dimensionA:number; dimensionB:number; total:number }>>().notNull(),
+  cerradoPor: text('cerrado_por').notNull(),
+  cerradoAt: timestamp('cerrado_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const digitalTramites = pgTable('digital_detalle_tramites', {
+  id: serial('id').primaryKey(),
+  organismoId: integer('organismo_id').references(() => organismos.id, { onDelete: 'cascade' }).notNull(),
+  fecha: varchar('fecha', { length: 10 }).notNull(),
+  nativos: integer('nativos').notNull().default(0),
+  integrados: integer('integrados').notNull().default(0),
+  fueraMiCorrientes: integer('fuera_mi_corrientes').notNull().default(0),
+  integradosLinks: jsonb('integrados_links').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  fueraMiCorrientesLinks: jsonb('fuera_mi_corrientes_links').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  usuario: text('usuario').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const digitalVisitas = pgTable('digital_visitas', {
+  id: serial('id').primaryKey(),
+  organismoId: integer('organismo_id').references(() => organismos.id, { onDelete: 'cascade' }).notNull(),
+  fecha: varchar('fecha', { length: 10 }).notNull(),
+  observaciones: text('observaciones'),
+  usuario: text('usuario').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const digitalMigrations = pgTable('digital_migrations', {
+  code: varchar('code', { length: 80 }).primaryKey(),
+  usuario: text('usuario').notNull(),
+  resumen: jsonb('resumen').$type<Record<string, number>>().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const digitalVerificaciones = pgTable('digital_verificaciones', {
+  organismoId: integer('organismo_id').references(() => organismos.id, { onDelete: 'cascade' }).primaryKey(),
+  variables: jsonb('variables').$type<Record<string, { estado: 'confirmado' | 'sin_evidencia'; nivel: number; usuario: string; fecha: string }>>().notNull().default({}),
+  cerradoPor: text('cerrado_por'),
+  cerradoAt: timestamp('cerrado_at', { withTimezone: true }),
 });
 

@@ -5,9 +5,10 @@ import { Award, Layers, TrendingUp, Sparkles, ShieldCheck, UserCheck, Cpu, Datab
 
 interface DigitalMaturityChartProps {
   organismos: Organismo[];
+  variant?: 'all' | 'macro' | 'details';
 }
 
-export default function DigitalMaturityChart({ organismos }: DigitalMaturityChartProps) {
+export default function DigitalMaturityChart({ organismos, variant = 'all' }: DigitalMaturityChartProps) {
   const [showWeights, setShowWeights] = useState(false);
   
   // Normalizador de texto
@@ -156,41 +157,82 @@ export default function DigitalMaturityChart({ organismos }: DigitalMaturityChar
       .sort((a, b) => b.promedio - a.promedio);
   }, [organismos]);
 
+  const maturityDistribution = useMemo(() => {
+    const levels = [
+      { label: 'Inicial', range: '0–25%', count: 0, color: 'bg-slate-400 dark:bg-slate-500' },
+      { label: 'En desarrollo', range: '26–50%', count: 0, color: 'bg-amber-500' },
+      { label: 'Avanzado', range: '51–75%', count: 0, color: 'bg-blue-500' },
+      { label: 'Líder', range: '76–100%', count: 0, color: 'bg-emerald-500' }
+    ];
+
+    organismos.forEach(org => {
+      const score = getMaturityGrade(org);
+      const index = score <= 25 ? 0 : score <= 50 ? 1 : score <= 75 ? 2 : 3;
+      levels[index].count += 1;
+    });
+
+    return levels.map(level => ({
+      ...level,
+      percentage: organismos.length ? Math.round((level.count / organismos.length) * 100) : 0
+    }));
+  }, [organismos]);
+
   const total = organismos.length;
 
   return (
     <div className="space-y-6">
       
       {/* 1. SECCIÓN PRINCIPAL: ÍNDICE GENERAL DE MADUREZ PROVINCIAL (IMDP) */}
-      <div className="bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-800 text-white rounded-2xl p-6 shadow-md">
+      {variant !== 'details' && (
+      <section aria-labelledby="imdp-title" className="border-b border-slate-200/80 dark:border-slate-800/80 pb-5 text-slate-900 dark:text-white">
         
         {/* Grid rígido de 12 columnas para evitar encogimiento lateral */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-center">
           
-          {/* Lado Izquierdo: Velocímetro e info general (col-span 5) */}
-          <div className="lg:col-span-5 flex items-center gap-5 shrink-0">
-            <div className="relative flex items-center justify-center w-24 h-24 rounded-full bg-slate-800/50 border-4 border-blue-500/30 shrink-0 shadow-lg">
-              {/* Círculo interior */}
-              <div className="absolute inset-2 rounded-full bg-slate-950 flex flex-col items-center justify-center border border-slate-800">
-                <span className="font-mono text-3xl font-extrabold text-blue-400 leading-none">
+          {/* Indicador de avance provincial */}
+          <div className="lg:col-span-5 flex items-center gap-4 min-w-0">
+            <div
+              className="relative h-20 w-20 shrink-0"
+              role="progressbar"
+              aria-label="Madurez provincial"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={provincialStats.imdp}
+            >
+              <svg className="absolute inset-0 -rotate-90" viewBox="0 0 100 100" aria-hidden="true">
+                <circle cx="50" cy="50" r="44" fill="none" strokeWidth="7" className="stroke-slate-200 dark:stroke-slate-800" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="44"
+                  fill="none"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 44}`}
+                  strokeDashoffset={`${2 * Math.PI * 44 * (1 - provincialStats.imdp / 100)}`}
+                  className="stroke-[#527eaf] dark:stroke-[#9fc3ec] transition-all duration-500"
+                />
+              </svg>
+              <div className="absolute inset-2 rounded-full bg-white dark:bg-slate-950 flex flex-col items-center justify-center">
+                <span className="font-mono text-2xl font-extrabold tracking-tight text-[#527eaf] dark:text-[#9fc3ec] leading-none">
                   {provincialStats.imdp}%
                 </span>
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-1">
-                  Madurez
+                <span className="text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mt-1">
+                  avance
                 </span>
               </div>
             </div>
             <div>
-              <span className="text-xs font-bold text-blue-400 uppercase tracking-widest block">Indicador Macro</span>
-              <h2 className="text-xl font-bold font-display tracking-tight mt-0.5">
+              <span className="text-xs font-bold text-[#527eaf] dark:text-[#9fc3ec] uppercase tracking-widest block">Indicador Macro</span>
+              <h2 id="imdp-title" className="text-xl font-bold font-display tracking-tight mt-0.5">
                 Índice de Madurez Digital Provincial
               </h2>
-              <p className="text-xs text-slate-350 dark:text-slate-400 mt-1 max-w-sm leading-relaxed">
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-sm leading-relaxed">
                 Puntaje compuesto que evalúa la digitalización de Corrientes sobre las 14 variables de madurez reales.
               </p>
               <button
                 onClick={() => setShowWeights(!showWeights)}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 transition cursor-pointer"
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#527eaf] hover:text-[#365f8b] dark:text-[#9fc3ec] dark:hover:text-white transition cursor-pointer"
               >
                 <HelpCircle className="w-3.5 h-3.5" />
                 {showWeights ? 'Ocultar Origen de Datos' : 'Ver de dónde salen estos números'}
@@ -200,60 +242,48 @@ export default function DigitalMaturityChart({ organismos }: DigitalMaturityChar
           </div>
 
           {/* Lado Derecho: Los 4 subíndices de gobierno (col-span 7) */}
-          <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-3 w-full">
+          <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 w-full">
             {/* IDC */}
-            <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl flex flex-col justify-between shadow-sm">
-              <div className="flex justify-between items-start gap-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-tight">Servicios Ciudadanos</span>
-                <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="min-w-0 px-1">
+              <div className="flex justify-between items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider leading-tight truncate">Servicios Ciudadanos</span>
+                <span className="text-sm font-bold font-mono text-emerald-500 dark:text-emerald-400 shrink-0">{provincialStats.idc}%</span>
               </div>
-              <div className="mt-3">
-                <span className="text-lg font-bold font-mono text-emerald-400">{provincialStats.idc}%</span>
-                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1.5">
-                  <div className="h-full bg-emerald-400 rounded-full" style={{ width: `${provincialStats.idc}%` }} />
-                </div>
+              <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-2">
+                <div className="h-full bg-emerald-500 dark:bg-emerald-400 rounded-full" style={{ width: `${provincialStats.idc}%` }} />
               </div>
             </div>
 
             {/* IDE */}
-            <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl flex flex-col justify-between shadow-sm">
-              <div className="flex justify-between items-start gap-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-tight">Eficiencia Interna</span>
-                <Database className="w-4 h-4 text-blue-400 shrink-0" />
+            <div className="min-w-0 px-1">
+              <div className="flex justify-between items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider leading-tight truncate">Eficiencia Interna</span>
+                <span className="text-sm font-bold font-mono text-blue-500 dark:text-blue-400 shrink-0">{provincialStats.ide}%</span>
               </div>
-              <div className="mt-3">
-                <span className="text-lg font-bold font-mono text-blue-400">{provincialStats.ide}%</span>
-                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1.5">
-                  <div className="h-full bg-blue-400 rounded-full" style={{ width: `${provincialStats.ide}%` }} />
-                </div>
+              <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-2">
+                <div className="h-full bg-blue-500 dark:bg-blue-400 rounded-full" style={{ width: `${provincialStats.ide}%` }} />
               </div>
             </div>
 
             {/* IIO */}
-            <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl flex flex-col justify-between shadow-sm">
-              <div className="flex justify-between items-start gap-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-tight">Innovación</span>
-                <Cpu className="w-4 h-4 text-fuchsia-400 shrink-0" />
+            <div className="min-w-0 px-1">
+              <div className="flex justify-between items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider leading-tight truncate">Innovación</span>
+                <span className="text-sm font-bold font-mono text-fuchsia-500 dark:text-fuchsia-400 shrink-0">{provincialStats.iio}%</span>
               </div>
-              <div className="mt-3">
-                <span className="text-lg font-bold font-mono text-fuchsia-400">{provincialStats.iio}%</span>
-                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1.5">
-                  <div className="h-full bg-fuchsia-400 rounded-full" style={{ width: `${provincialStats.iio}%` }} />
-                </div>
+              <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-2">
+                <div className="h-full bg-fuchsia-500 dark:bg-fuchsia-400 rounded-full" style={{ width: `${provincialStats.iio}%` }} />
               </div>
             </div>
 
             {/* IPW */}
-            <div className="bg-slate-950/40 border border-slate-850 p-3 rounded-xl flex flex-col justify-between shadow-sm">
-              <div className="flex justify-between items-start gap-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-tight">Identidad Web</span>
-                <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
+            <div className="min-w-0 px-1">
+              <div className="flex justify-between items-center gap-1">
+                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider leading-tight truncate">Identidad Web</span>
+                <span className="text-sm font-bold font-mono text-teal-500 dark:text-teal-400 shrink-0">{provincialStats.ipw}%</span>
               </div>
-              <div className="mt-3">
-                <span className="text-lg font-bold font-mono text-teal-400">{provincialStats.ipw}%</span>
-                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden mt-1.5">
-                  <div className="h-full bg-teal-400 rounded-full" style={{ width: `${provincialStats.ipw}%` }} />
-                </div>
+              <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mt-2">
+                <div className="h-full bg-teal-500 dark:bg-teal-400 rounded-full" style={{ width: `${provincialStats.ipw}%` }} />
               </div>
             </div>
           </div>
@@ -262,182 +292,182 @@ export default function DigitalMaturityChart({ organismos }: DigitalMaturityChar
 
         {/* Panel Desplegable de Ponderaciones y Adopción Provincial Real */}
         {showWeights && (
-          <div className="mt-6 pt-6 border-t border-slate-800/80 grid grid-cols-1 md:grid-cols-4 gap-4 animate-fadeIn text-xs">
+          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800/80 grid grid-cols-1 md:grid-cols-4 gap-4 animate-fadeIn text-xs">
             
             {/* Bloque 1 - Servicios al Ciudadano */}
-            <div className="space-y-3 bg-slate-950/30 p-3 rounded-xl border border-slate-850/50">
+            <div className="space-y-3 bg-white/80 dark:bg-slate-950/30 p-3 rounded-xl border border-slate-200 dark:border-slate-700/50">
               <span className="font-bold text-emerald-400 flex items-center gap-1.5 border-b border-slate-800/80 pb-1">
                 <UserCheck className="w-3.5 h-3.5 shrink-0" />
                 Servicios al Ciudadano (45%)
               </span>
-              <div className="space-y-2 text-slate-300">
+              <div className="space-y-2 text-slate-700 dark:text-slate-300">
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Trámites Online</span>
                     <span className="font-bold text-emerald-400 font-mono">20%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.tramites} de {total} ({Math.round(provincialStats.counts.tramites/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.tramites} de {total} ({Math.round(provincialStats.counts.tramites/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Guía de Trámites</span>
                     <span className="font-bold text-emerald-400 font-mono">10%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.guia} de {total} ({Math.round(provincialStats.counts.guia/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.guia} de {total} ({Math.round(provincialStats.counts.guia/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Turnos Online</span>
                     <span className="font-bold text-emerald-400 font-mono">5%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.turnos} de {total} ({Math.round(provincialStats.counts.turnos/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.turnos} de {total} ({Math.round(provincialStats.counts.turnos/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Seguimiento Digital</span>
                     <span className="font-bold text-emerald-400 font-mono">5%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.seguimiento} de {total} ({Math.round(provincialStats.counts.seguimiento/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.seguimiento} de {total} ({Math.round(provincialStats.counts.seguimiento/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Atención Digital</span>
                     <span className="font-bold text-emerald-400 font-mono">5%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.atencion} de {total} ({Math.round(provincialStats.counts.atencion/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.atencion} de {total} ({Math.round(provincialStats.counts.atencion/total * 100)}%)</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Bloque 2 - Eficiencia Interna */}
-            <div className="space-y-3 bg-slate-950/30 p-3 rounded-xl border border-slate-850/50">
+            <div className="space-y-3 bg-white/80 dark:bg-slate-950/30 p-3 rounded-xl border border-slate-200 dark:border-slate-700/50">
               <span className="font-bold text-blue-400 flex items-center gap-1.5 border-b border-slate-800/80 pb-1">
                 <Database className="w-3.5 h-3.5 shrink-0" />
                 Eficiencia Interna (30%)
               </span>
-              <div className="space-y-2 text-slate-300">
+              <div className="space-y-2 text-slate-700 dark:text-slate-300">
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Expediente Digital</span>
                     <span className="font-bold text-blue-400 font-mono">10%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.expediente} de {total} ({Math.round(provincialStats.counts.expediente/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.expediente} de {total} ({Math.round(provincialStats.counts.expediente/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Tienen Firma Digital</span>
                     <span className="font-bold text-blue-400 font-mono">10%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.firma} de {total} ({Math.round(provincialStats.counts.firma/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.firma} de {total} ({Math.round(provincialStats.counts.firma/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Contratado Doco</span>
                     <span className="font-bold text-blue-400 font-mono">5%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.doco} de {total} ({Math.round(provincialStats.counts.doco/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.doco} de {total} ({Math.round(provincialStats.counts.doco/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Uso de SiiF</span>
                     <span className="font-bold text-blue-400 font-mono">5%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.siif} de {total} ({Math.round(provincialStats.counts.siif/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.siif} de {total} ({Math.round(provincialStats.counts.siif/total * 100)}%)</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Bloque 3 - Identidad Web */}
-            <div className="space-y-3 bg-slate-950/30 p-3 rounded-xl border border-slate-850/50">
+            <div className="space-y-3 bg-white/80 dark:bg-slate-950/30 p-3 rounded-xl border border-slate-200 dark:border-slate-700/50">
               <span className="font-bold text-teal-400 flex items-center gap-1.5 border-b border-slate-800/80 pb-1">
                 <Sparkles className="w-3.5 h-3.5 shrink-0" />
                 Identidad Web (15%)
               </span>
-              <div className="space-y-2 text-slate-300">
+              <div className="space-y-2 text-slate-700 dark:text-slate-300">
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Sitio Web Oficial</span>
                     <span className="font-bold text-teal-400 font-mono">10%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.web} de {total} ({Math.round(provincialStats.counts.web/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.web} de {total} ({Math.round(provincialStats.counts.web/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Sitio Web Propio</span>
                     <span className="font-bold text-teal-400 font-mono">5%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.webPropia} de {total} ({Math.round(provincialStats.counts.webPropia/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.webPropia} de {total} ({Math.round(provincialStats.counts.webPropia/total * 100)}%)</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Bloque 4 - Innovación */}
-            <div className="space-y-3 bg-slate-950/30 p-3 rounded-xl border border-slate-850/50">
+            <div className="space-y-3 bg-white/80 dark:bg-slate-950/30 p-3 rounded-xl border border-slate-200 dark:border-slate-700/50">
               <span className="font-bold text-fuchsia-400 flex items-center gap-1.5 border-b border-slate-800/80 pb-1">
                 <Cpu className="w-3.5 h-3.5 shrink-0" />
                 Innovación (10%)
               </span>
-              <div className="space-y-2 text-slate-300">
+              <div className="space-y-2 text-slate-700 dark:text-slate-300">
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Optimización Procesos</span>
                     <span className="font-bold text-fuchsia-400 font-mono">5%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.procesos} de {total} ({Math.round(provincialStats.counts.procesos/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.procesos} de {total} ({Math.round(provincialStats.counts.procesos/total * 100)}%)</span>
                   </div>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-[11px] font-medium text-slate-200">
+                  <div className="flex justify-between text-[11px] font-medium text-slate-700 dark:text-slate-200">
                     <span>Uso IA o Chatbot</span>
                     <span className="font-bold text-fuchsia-400 font-mono">5%</span>
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-0.5 flex justify-between">
+                  <div className="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 flex justify-between">
                     <span>Adopción Provincial:</span>
-                    <span className="font-semibold text-white">{provincialStats.counts.iaOrChatbot} de {total} ({Math.round(provincialStats.counts.iaOrChatbot/total * 100)}%)</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{provincialStats.counts.iaOrChatbot} de {total} ({Math.round(provincialStats.counts.iaOrChatbot/total * 100)}%)</span>
                   </div>
                 </div>
               </div>
@@ -445,10 +475,12 @@ export default function DigitalMaturityChart({ organismos }: DigitalMaturityChar
 
           </div>
         )}
-      </div>
+      </section>
+      )}
 
       {/* 2. GRÁFICOS SECUNDARIOS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {variant !== 'macro' && (
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {/* Chart 1: Top 5 Agencies */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
           <h3 className="font-display font-bold text-slate-850 dark:text-slate-100 text-sm flex items-center gap-2 mb-4">
@@ -543,7 +575,45 @@ export default function DigitalMaturityChart({ organismos }: DigitalMaturityChar
             </div>
           )}
         </div>
+
+        {/* Chart 3: distribution by maturity range */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
+          <h3 className="font-display font-bold text-slate-850 dark:text-slate-100 text-sm flex items-center gap-2 mb-1">
+            <TrendingUp className="h-4.5 w-4.5 text-emerald-500" />
+            Organismos por nivel de madurez
+          </h3>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-5">
+            Distribución según el puntaje individual de cada organismo.
+          </p>
+
+          {organismos.length === 0 ? (
+            <div className="py-8 text-center text-xs text-slate-400 dark:text-slate-500">Sin organismos para clasificar</div>
+          ) : (
+            <div className="space-y-5">
+              {maturityDistribution.map(level => (
+                <div key={level.label} className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{level.label}</span>
+                      <span className="ml-2 text-[10px] text-slate-500 dark:text-slate-400">{level.range}</span>
+                    </div>
+                    <span className="shrink-0 font-mono font-bold text-slate-700 dark:text-slate-300">
+                      {level.count} <span className="font-normal text-slate-500 dark:text-slate-400">({level.percentage}%)</span>
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div className={`h-full rounded-full transition-all duration-700 ${level.color}`} style={{ width: `${level.percentage}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-6 pt-3 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400">
+            Total analizado: <span className="font-semibold text-slate-700 dark:text-slate-300">{organismos.length} organismos</span>
+          </div>
+        </div>
       </div>
+      )}
 
     </div>
   );

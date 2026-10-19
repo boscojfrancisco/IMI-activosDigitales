@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Organismo } from '../types';
 import { getMaturityGrade } from './OrganismoCard';
 import { 
-  Check, X, Search, Info, HelpCircle, ExternalLink, Edit,
-  Printer, Clock, Award, ShieldCheck, Bot, Sparkles, BookOpen, 
+  Check, X, Search, Info, HelpCircle, ExternalLink, Edit, ChevronDown,
+  Printer, Clock, Award, ShieldCheck, Bot, Sparkles, BookOpen, ChevronLeft, ChevronRight,
   Laptop, CalendarCheck, Globe, FileText, CheckCircle2, XCircle, Calendar
 } from 'lucide-react';
 
@@ -27,13 +27,20 @@ interface MatrixTableProps {
   onEdit?: (org: Organismo) => void;
   comparedOrgIds: number[];
   onToggleCompare: (id: number) => void;
+  staleCount: number;
+  staleOnly: boolean;
+  onToggleStaleFilter: () => void;
 }
 
-export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onToggleCompare }: MatrixTableProps) {
+export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onToggleCompare, staleCount, staleOnly, onToggleStaleFilter }: MatrixTableProps) {
   const [rowSearch, setRowSearch] = useState('');
+  const [horizontalScroll, setHorizontalScroll] = useState(0);
+  const [horizontalScrollMax, setHorizontalScrollMax] = useState(0);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
   const [expandedReviews, setExpandedReviews] = useState<Record<string, boolean>>({});
   const [expandedOrgId, setExpandedOrgId] = useState<number | null>(null);
   const [simulatedKeys, setSimulatedKeys] = useState<Record<string, boolean>>({});
+  const [showWeighting, setShowWeighting] = useState(false);
 
   const toggleReview = (orgId: number, colLabel: string) => {
     const key = `${orgId}-${colLabel}`;
@@ -639,9 +646,32 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
     o.nombre.toLowerCase().includes(rowSearch.toLowerCase())
   );
 
+  useEffect(() => {
+    const container = tableScrollRef.current;
+    if (!container) return;
+
+    const updateScrollMetrics = () => {
+      setHorizontalScrollMax(Math.max(0, container.scrollWidth - container.clientWidth));
+      setHorizontalScroll(container.scrollLeft);
+    };
+
+    updateScrollMetrics();
+    const observer = new ResizeObserver(updateScrollMetrics);
+    observer.observe(container);
+    const table = container.querySelector('table');
+    if (table) observer.observe(table);
+    return () => observer.disconnect();
+  }, [organismos.length, filteredOrganismos.length]);
+
+  const scrollMatrix = (direction: -1 | 1) => {
+    const container = tableScrollRef.current;
+    if (!container) return;
+    container.scrollBy({ left: direction * Math.max(320, container.clientWidth * 0.7), behavior: 'smooth' });
+  };
+
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
+      <div className="space-y-3 pb-3 border-b border-slate-100 dark:border-slate-800">
         <div>
           <h3 className="font-display font-bold text-slate-800 dark:text-slate-100 text-lg">
             Matriz Comparativa de Capacidades Digitales
@@ -651,25 +681,73 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
           </p>
         </div>
         
-        {/* Búsqueda de Organismos (Filas) */}
-        <div className="relative w-full sm:w-64">
-          <input
-            type="text"
-            className="w-full pl-8 pr-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none focus:ring-1.5 focus:ring-blue-500"
-            placeholder="Filtrar organismos..."
-            value={rowSearch}
-            onChange={(e) => setRowSearch(e.target.value)}
-          />
-          <Search className="absolute left-2.5 top-2.2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          {/* Search and stale data filter share one compact toolbar. */}
+          <div className="relative flex-1 sm:max-w-sm">
+            <input
+              type="text"
+              className="w-full pl-8 pr-3 py-2 border border-slate-200 dark:border-slate-800 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-xs focus:outline-none focus:ring-1.5 focus:ring-blue-500"
+              placeholder="Filtrar organismos..."
+              value={rowSearch}
+              onChange={(e) => setRowSearch(e.target.value)}
+            />
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+          </div>
+          {staleCount > 0 && (
+            <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0 rounded-lg border border-amber-200/80 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 px-2.5 py-1.5 text-[11px] text-amber-800 dark:text-amber-300">
+              <span className="truncate" title={`${staleCount} organismo(s) sin actualizar por más de 90 días`}>
+                <span className="font-bold">{staleCount}</span> desactualizados <span className="hidden md:inline">(&gt;90 días)</span>
+              </span>
+              <button
+                onClick={onToggleStaleFilter}
+                className={`shrink-0 px-2.5 py-1 rounded-md font-bold transition cursor-pointer ${staleOnly ? 'bg-amber-200 dark:bg-amber-800' : 'bg-amber-100 hover:bg-amber-200 dark:bg-amber-900/50 dark:hover:bg-amber-800'}`}
+              >
+                {staleOnly ? 'Ver todos' : 'Filtrar'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {organismos.length > 0 && horizontalScrollMax > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/40 px-2.5 py-2">
+          <span className="hidden sm:block shrink-0 text-[10px] font-semibold text-slate-500 dark:text-slate-400">Desplazarse por columnas</span>
+          <button
+            type="button"
+            onClick={() => scrollMatrix(-1)}
+            disabled={horizontalScroll <= 0}
+            aria-label="Ver columnas anteriores"
+            className="shrink-0 rounded-md p-1 text-slate-600 hover:bg-white hover:text-blue-600 disabled:opacity-35 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-blue-400 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={horizontalScrollMax}
+            value={Math.min(horizontalScroll, horizontalScrollMax)}
+            onChange={(event) => tableScrollRef.current?.scrollTo({ left: Number(event.target.value) })}
+            aria-label="Posición horizontal de la matriz"
+            className="h-1.5 min-w-0 flex-1 cursor-pointer accent-blue-600 dark:accent-blue-400"
+          />
+          <button
+            type="button"
+            onClick={() => scrollMatrix(1)}
+            disabled={horizontalScroll >= horizontalScrollMax - 1}
+            aria-label="Ver columnas siguientes"
+            className="shrink-0 rounded-md p-1 text-slate-600 hover:bg-white hover:text-blue-600 disabled:opacity-35 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-blue-400 disabled:hover:bg-transparent cursor-pointer disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {organismos.length === 0 ? (
         <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm">
           No hay datos de organismos para renderizar la matriz.
         </div>
       ) : (
-        <div className="relative overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
+        <div className="relative overflow-x-auto rounded-xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 [container-type:inline-size]" ref={tableScrollRef} onScroll={(event) => setHorizontalScroll(event.currentTarget.scrollLeft)}>
           <table className="w-full text-xs text-center border-separate border-spacing-0">
             <thead className="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300">
               <tr>
@@ -807,8 +885,9 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
                     {/* Ficha Expandida de Recomendaciones, Logros e Impacto */}
                     {expandedOrgId === org.id && (
                       <tr className="bg-slate-50/50 dark:bg-slate-950/20">
-                        <td colSpan={columnsDef.length + 1} className="p-5 border-b border-slate-200 dark:border-slate-800 text-left">
-                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
+                        <td colSpan={columnsDef.length + 1} className="p-0 border-b border-slate-200 dark:border-slate-800 text-left">
+                          <div className="sticky left-0 w-[100cqw] p-5">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 animate-fadeIn">
                             
                             {/* Columna 1: Plan de Acción y Simulador */}
                             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm space-y-4">
@@ -901,7 +980,7 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
                             </div>
 
                             {/* Columna 3: Metadata y Impresión */}
-                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm flex flex-col justify-between h-full gap-4">
+                            <div className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4.5 shadow-sm flex flex-col justify-between h-full gap-4">
                               <div className="space-y-4">
                                 <h4 className="font-bold text-xs text-slate-800 dark:text-slate-250 uppercase tracking-wider">
                                   Información y Frescura
@@ -949,6 +1028,7 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
                             </div>
 
                           </div>
+                          </div>
                         </td>
                       </tr>
                     )}
@@ -960,26 +1040,15 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
         </div>
       )}
 
-      {/* Info and Weighting Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Navigation Info */}
-        <div className="flex items-start gap-2.5 bg-blue-50/50 dark:bg-slate-950/30 border border-blue-100 dark:border-slate-800/80 p-4 rounded-xl text-xs text-slate-700 dark:text-slate-300 shadow-sm">
-          <Info className="h-4.5 w-4.5 text-blue-500 shrink-0 mt-0.5" />
-          <div>
-            <h5 className="font-semibold text-blue-900 dark:text-blue-400 mb-1">Visualización horizontal y vertical</h5>
-            <p className="leading-relaxed">
-              Puedes desplazarte horizontalmente para ver todas las variables digitales y verticalmente por toda la página para recorrer los 41 organismos. La primera columna con el nombre de cada institución permanecerá visible en todo momento.
-            </p>
-          </div>
-        </div>
-
-        {/* Maturity Weighting Legend */}
-        <div className="flex items-start gap-2.5 bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 p-4 rounded-xl text-xs text-slate-700 dark:text-slate-300 shadow-sm">
-          <HelpCircle className="h-4.5 w-4.5 text-indigo-500 shrink-0 mt-0.5" />
-          <div className="w-full">
-            <h5 className="font-semibold text-slate-900 dark:text-slate-200 mb-1.5 flex items-center gap-1.5">
-              Criterio de Ponderación (Índice de Madurez)
-            </h5>
+      {/* Maturity Weighting Legend */}
+      <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-xl text-xs text-slate-700 dark:text-slate-300 shadow-sm overflow-hidden">
+        <button type="button" aria-expanded={showWeighting} aria-controls="maturity-weighting-details" onClick={() => setShowWeighting(value => !value)} className="flex w-full items-center gap-2.5 p-4 text-left hover:bg-slate-100/70 dark:hover:bg-slate-900/60 transition-colors">
+          <HelpCircle className="h-4.5 w-4.5 text-indigo-500 shrink-0" />
+          <span className="flex-1 font-semibold text-slate-900 dark:text-slate-200">Criterio de Ponderación (Índice de Madurez)</span>
+          <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${showWeighting ? 'rotate-180' : ''}`} />
+        </button>
+        {showWeighting && <div id="maturity-weighting-details" className="px-4 pb-4">
+          <div className="pl-6">
             <p className="leading-relaxed mb-3 text-slate-550 dark:text-slate-400">
               El porcentaje de madurez digital de cada organismo se calcula de forma automatizada distribuyendo 100 puntos en base a las siguientes capacidades activas:
             </p>
@@ -1030,7 +1099,7 @@ export default function MatrixTable({ organismos, onEdit, comparedOrgIds, onTogg
               </div>
             </div>
           </div>
-        </div>
+        </div>}
       </div>
 
     </div>

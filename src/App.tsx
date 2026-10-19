@@ -12,9 +12,10 @@ import GeneralHistory from './components/GeneralHistory';
 import ComparatorModal from './components/ComparatorModal';
 import LoginModal from './components/LoginModal';
 import UserManagement from './components/UserManagement';
+import DigitalIndex from './components/DigitalIndex';
 import { AnimatePresence, motion } from 'motion/react';
 import { 
-  Building2, 
+  Building2,
   Moon, 
   Sun, 
   RefreshCw, 
@@ -58,7 +59,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   
   // UI views and themes
-  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history' | 'users'>('matrix');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history' | 'users' | 'index'>('index');
   
   // Auth state
   const [token, setToken] = useState<string | null>(null);
@@ -70,11 +71,10 @@ export default function App() {
   const [comparedOrgIds, setComparedOrgIds] = useState<number[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isDark, setIsDark] = useState<boolean>(() => {
-    // Check local storage or media preferences
+    // Start in light mode unless the user explicitly chose a theme before.
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('theme');
+      const saved = localStorage.getItem('imi_theme');
       if (saved) return saved === 'dark';
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
     return false;
   });
@@ -86,10 +86,10 @@ export default function App() {
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      localStorage.setItem('imi_theme', 'dark');
     } else {
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      localStorage.setItem('imi_theme', 'light');
     }
   }, [isDark]);
 
@@ -366,12 +366,23 @@ export default function App() {
       <div className="absolute top-1/3 left-0 w-[400px] h-[300px] bg-violet-500/5 dark:bg-violet-500/2 blur-[100px] pointer-events-none rounded-full" />
 
       {/* Main Container */}
-      <div id="appContainer" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+      <div id="appContainer" className="w-full max-w-none mx-auto px-4 sm:px-6 xl:px-8 2xl:px-10 pt-6">
         
         {/* Navigation Bar / Top Header */}
         <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 mb-8 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-blue-600 dark:bg-blue-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+            <img
+              src={`${import.meta.env.BASE_URL}branding/logo-imi-gobierno-claro.png`}
+              alt="Instituto de Modernización e Innovación y Gobierno de Corrientes"
+              className="hidden sm:block w-[clamp(160px,16vw,210px)] h-auto object-contain dark:hidden"
+            />
+            <img
+              src={`${import.meta.env.BASE_URL}branding/logo-imi-gobierno-oscuro.png`}
+              alt="Instituto de Modernización e Innovación y Gobierno de Corrientes"
+              className="hidden sm:dark:block w-[clamp(160px,16vw,210px)] h-auto object-contain"
+            />
+            <div className="h-9 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
+            <div className="h-10 w-10 rounded-xl bg-[#739ed2] dark:bg-[#527eaf] flex items-center justify-center text-white shadow-md shadow-blue-500/15 sm:hidden">
               <Building2 className="h-5.5 w-5.5" />
             </div>
             <div>
@@ -409,25 +420,29 @@ export default function App() {
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
 
-            {/* Export JSON Button */}
-            <button
-              onClick={handleExportDataJson}
-              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer flex items-center justify-center"
-              title="Exportar datos a JSON"
-              aria-label="Exportar datos"
-            >
-              <ArrowRightCircle className="h-4 w-4 rotate-90 text-blue-500" />
-            </button>
+            {user && (
+              <>
+                {/* Export JSON Button */}
+                <button
+                  onClick={handleExportDataJson}
+                  className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer flex items-center justify-center"
+                  title="Exportar datos a JSON"
+                  aria-label="Exportar datos"
+                >
+                  <ArrowRightCircle className="h-4 w-4 rotate-90 text-blue-500" />
+                </button>
 
-            {/* Export CSV Button */}
-            <button
-              onClick={handleExportDataCsv}
-              className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer flex items-center justify-center"
-              title="Exportar datos a Excel / CSV"
-              aria-label="Exportar Excel"
-            >
-              <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
-            </button>
+                {/* Export CSV Button */}
+                <button
+                  onClick={handleExportDataCsv}
+                  className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer flex items-center justify-center"
+                  title="Exportar datos a Excel / CSV"
+                  aria-label="Exportar Excel"
+                >
+                  <FileSpreadsheet className="h-4 w-4 text-emerald-500" />
+                </button>
+              </>
+            )}
 
             {/* Dark Mode toggle */}
             <button
@@ -455,7 +470,7 @@ export default function App() {
                     localStorage.removeItem('imi_auth_user');
                     setToken(null);
                     setUser(null);
-                    setActiveTab('matrix');
+                    setActiveTab('index');
                   }}
                   className="p-2.5 rounded-xl bg-white hover:bg-rose-50 hover:text-rose-600 dark:bg-slate-900 dark:hover:bg-rose-955/20 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 transition shadow-sm cursor-pointer flex items-center justify-center"
                   title="Cerrar sesión"
@@ -466,7 +481,7 @@ export default function App() {
             ) : (
               <button
                 onClick={() => setIsLoginOpen(true)}
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/10 cursor-pointer transition flex items-center gap-1.5"
+                className="px-3.5 py-2 bg-[#527eaf] hover:bg-[#426b9c] dark:bg-[#527eaf] dark:hover:bg-[#426b9c] text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/10 cursor-pointer transition flex items-center gap-1.5"
               >
                 <LogIn className="h-4 w-4" />
                 <span>Ingresar</span>
@@ -506,15 +521,6 @@ export default function App() {
             transition={{ duration: 0.3 }}
             className="space-y-6"
           >
-            {/* Aggregate Stats Row */}
-            <StatsGrid
-              stats={currentStats}
-              filters={filters}
-              setFilters={setFilters}
-              onResetFilters={handleResetFilters}
-              staleCount={organismos.filter(isStale).length}
-            />
-
             {/* Dashboard Workspace */}
             <div className="w-full space-y-6">
               
@@ -527,19 +533,22 @@ export default function App() {
                   {/* Sliding Tabs */}
                   <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl w-full sm:w-auto relative select-none">
                     <button
+                      onClick={() => setActiveTab('index')}
+                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${activeTab === 'index' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                    >
+                      <Sparkle className="h-3.5 w-3.5" />
+                      Índice provincial
+                    </button>
+                    <button
                       onClick={() => setActiveTab('matrix')}
-                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
-                        activeTab === 'matrix' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                      }`}
+                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${activeTab === 'matrix' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
                     >
                       <Grid3X3 className="h-3.5 w-3.5" />
                       Matriz
                     </button>
                     <button
                       onClick={() => setActiveTab('charts')}
-                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${
-                        activeTab === 'charts' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                      }`}
+                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${activeTab === 'charts' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
                     >
                       <BarChart3 className="h-3.5 w-3.5" />
                       Métricas
@@ -568,44 +577,13 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Results Count Summary */}
-                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 font-mono">
-                    {filteredAndSortedList.length} de {organismos.length} organismos encontrados
-                  </div>
                 </div>
 
+                {(activeTab === 'index' || activeTab === 'matrix' || activeTab === 'charts') && <DigitalIndex organismos={organismos} token={token} role={user?.tableroAcceso} view={activeTab === 'charts' ? 'metrics' : activeTab === 'matrix' ? 'matrix' : 'index'} />}
+
                 {/* Sub-Views container based on Active Tab */}
-                <div className="min-h-[400px]">
+                {(activeTab === 'history' || activeTab === 'users') && <div className="min-h-[400px]">
                   <AnimatePresence mode="wait">
-                    {activeTab === 'matrix' && (
-                      <motion.div
-                        key="matrix-view"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <MatrixTable
-                          organismos={filteredAndSortedList}
-                          onEdit={(user?.tableroAcceso === 'admin' || user?.tableroAcceso === 'editor') ? setEditingOrg : undefined}
-                          comparedOrgIds={comparedOrgIds}
-                          onToggleCompare={(id) => setComparedOrgIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 3 ? [...prev, id] : prev)}
-                        />
-                      </motion.div>
-                    )}
-
-                    {activeTab === 'charts' && (
-                      <motion.div
-                        key="charts-view"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <DigitalMaturityChart organismos={filteredAndSortedList} />
-                      </motion.div>
-                    )}
-
                     {activeTab === 'history' && (user?.tableroAcceso === 'admin' || user?.tableroAcceso === 'editor') && (
                       <motion.div
                         key="history-view"
@@ -630,7 +608,7 @@ export default function App() {
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </div>
+                </div>}
 
               </div>
 

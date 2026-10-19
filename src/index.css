@@ -55,3 +55,20 @@ html {
 .glow-hover:hover {
   box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
 }
+
+.field {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  border: 1px solid rgb(203 213 225);
+  border-radius: 0.5rem;
+  background: white;
+  padding: 0.55rem 0.65rem;
+  color: inherit;
+  font-size: 0.875rem;
+}
+
+.dark .field {
+  border-color: rgb(51 65 85);
+  background: rgb(2 6 23);
+}

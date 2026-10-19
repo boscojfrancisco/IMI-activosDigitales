@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, History, ArrowRight, User, Check, X, RefreshCw, Search } from 'lucide-react';
 import { apiUrl } from '../lib/api';
+import catalog from '../data/digital-index-catalog.json';
 
 interface HistoryItem {
   id: number;
@@ -15,19 +16,32 @@ interface GeneralHistoryProps {
   token?: string | null;
 }
 
+interface DigitalObservation {
+  id:number; organismoId:number; variableId:string; nivel:number; fuente:string;
+  fechaObservacion:string; evidencia?:string|null; notas?:string|null; usuario:string; createdAt:string;
+}
+
 export default function GeneralHistory({ token }: GeneralHistoryProps) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [digitalObservations, setDigitalObservations] = useState<DigitalObservation[]>([]);
+  const [organismNames, setOrganismNames] = useState<Record<number,string>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
   const fetchHistory = async () => {
     try {
-      const res = await fetch(apiUrl('/api/history'), {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      });
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const [res, observationsRes, organismsRes] = await Promise.all([fetch(apiUrl('/api/history'), {
+        headers
+      }), fetch(apiUrl('/api/digital-index/observations')), fetch(apiUrl('/api/organismos'))]);
       if (res.ok) {
         const data = await res.json();
         setHistory(data);
+      }
+      if (observationsRes.ok) setDigitalObservations(await observationsRes.json());
+      if (organismsRes.ok) {
+        const rows = await organismsRes.json();
+        setOrganismNames(Object.fromEntries(rows.map((org:any) => [org.id, org.nombre])));
       }
     } catch (e) {
       console.error('Error fetching general history:', e);
@@ -200,7 +214,7 @@ export default function GeneralHistory({ token }: GeneralHistoryProps) {
         <div>
           <h3 className="font-display font-bold text-slate-800 dark:text-slate-100 text-lg flex items-center gap-2">
             <History className="h-5 w-5 text-blue-500" />
-            Historial y Evolución General de Indicadores
+            Historial de observaciones y cambios
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             Auditoría interactiva en tiempo real de los cambios y digitalización del sector público.
@@ -271,6 +285,14 @@ export default function GeneralHistory({ token }: GeneralHistoryProps) {
           ))}
         </div>
       )}
+      <section className="border-t border-slate-200 pt-5 dark:border-slate-800">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div><h4 className="font-bold text-slate-800 dark:text-slate-100">Observaciones del índice nuevo</h4><p className="text-xs text-slate-500">Las evaluaciones se agregan; la más reciente queda vigente y el registro previo se conserva.</p></div>
+          <span className="text-xs text-slate-500">{digitalObservations.length} registros</span>
+        </div>
+        {digitalObservations.length===0?<p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 dark:bg-slate-950">Todavía no hay observaciones nuevas. La línea de base se puede incorporar desde el Índice provincial.</p>:
+        <div className="max-h-[480px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800"><table className="w-full min-w-[850px] text-left text-xs"><thead className="sticky top-0 bg-slate-50 text-slate-500 dark:bg-slate-950"><tr>{['Fecha','Organismo','Variable','Nivel','Fuente','Evidencia','Usuario'].map(label=><th key={label} className="p-3">{label}</th>)}</tr></thead><tbody>{digitalObservations.filter(item=>{const variable=catalog.find(v=>v.id===item.variableId);const haystack=`${organismNames[item.organismoId]||''} ${item.variableId} ${variable?.name||''} ${item.usuario}`.toLocaleLowerCase();return haystack.includes(searchQuery.toLocaleLowerCase());}).slice(0,150).map(item=>{const variable=catalog.find(v=>v.id===item.variableId);return <tr key={item.id} className="border-t border-slate-100 dark:border-slate-800"><td className="p-3">{item.fechaObservacion}</td><td className="p-3 font-semibold">{organismNames[item.organismoId]||`Organismo ${item.organismoId}`}</td><td className="p-3">{item.variableId} · {variable?.name||'Variable'}</td><td className="p-3">{item.notas?.startsWith('[base monitor anterior]')?'Migrado · ':''}Nivel {item.nivel}</td><td className="p-3">{item.fuente}</td><td className="p-3">{item.evidencia?<a href={item.evidencia} target="_blank" rel="noreferrer" className="text-blue-700 underline">Abrir</a>:'—'}</td><td className="p-3">{item.usuario}</td></tr>})}</tbody></table></div>}
+      </section>
     </div>
   );
 }
