@@ -57,9 +57,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   
   // UI views and themes
-  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history' | 'users' | 'index'>('index');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history' | 'users' | 'index' | 'organismos' | 'madurez'>('index');
   
   // Auth state
   const [token, setToken] = useState<string | null>(null);
@@ -129,12 +130,16 @@ export default function App() {
   const loadData = async (isRef = false) => {
     if (isRef) setRefreshing(true);
     else setLoading(true);
-    setError(null);
+    if (!isRef) setError(null);
     try {
       const data = await fetchOrganismos();
       setOrganismos(data);
+      setError(null);
+      setRefreshError(null);
     } catch (err: any) {
-      setError(err?.message || 'Ocurrió un error al rescatar los datos de Corrientes.');
+      const message = err?.message || 'Ocurrió un error al cargar los datos de organismos.';
+      if (isRef && organismos.length > 0) setRefreshError(message);
+      else setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -414,8 +419,8 @@ export default function App() {
               onClick={() => loadData(true)}
               disabled={refreshing}
               className="p-2.5 rounded-xl bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 transition shadow-sm cursor-pointer flex items-center justify-center disabled:opacity-50"
-              title="Sincronizar datos con Google Sheets"
-              aria-label="Sincronizar datos"
+              title="Actualizar datos de organismos"
+              aria-label="Actualizar datos"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
@@ -491,19 +496,21 @@ export default function App() {
 
         </header>
 
+        {refreshError && <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"><span>No se pudieron actualizar los datos. Se mantienen los últimos datos cargados. ({refreshError})</span><button onClick={()=>loadData(true)} disabled={refreshing} className="font-semibold underline disabled:opacity-50">Reintentar</button></div>}
+
         {/* Loading Indicator */}
         {loading ? (
           <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 py-16">
             <div className="h-10 w-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
             <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-              Conectando con Google Sheets y descargando datos en vivo...
+              Cargando datos de organismos...
             </span>
           </div>
         ) : error ? (
           <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-2xl p-6 my-8 flex items-start gap-4 max-w-2xl mx-auto">
             <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
             <div className="space-y-2">
-              <h3 className="font-semibold text-red-900 dark:text-red-300">Error al descargar datos</h3>
+              <h3 className="font-semibold text-red-900 dark:text-red-300">Error al cargar datos</h3>
               <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
               <button
                 onClick={() => loadData()}
@@ -553,6 +560,20 @@ export default function App() {
                       <BarChart3 className="h-3.5 w-3.5" />
                       Métricas
                     </button>
+                    <button
+                      onClick={() => setActiveTab('organismos')}
+                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${activeTab === 'organismos' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                    >
+                      <LayoutGrid className="h-3.5 w-3.5" />
+                      Organismos
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('madurez')}
+                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${activeTab === 'madurez' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Madurez
+                    </button>
                     {(user?.tableroAcceso === 'admin' || user?.tableroAcceso === 'editor') && (
                       <button
                         onClick={() => setActiveTab('history')}
@@ -580,6 +601,19 @@ export default function App() {
                 </div>
 
                 {(activeTab === 'index' || activeTab === 'matrix' || activeTab === 'charts') && <DigitalIndex organismos={organismos} token={token} role={user?.tableroAcceso} view={activeTab === 'charts' ? 'metrics' : activeTab === 'matrix' ? 'matrix' : 'index'} />}
+
+                {activeTab === 'organismos' && <div className="space-y-5">
+                  <StatsGrid stats={currentStats} filters={filters} setFilters={setFilters} onResetFilters={handleResetFilters}/>
+                  <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+                    <FilterSidebar filters={filters} setFilters={setFilters} tiposDisponibles={tiposDisponibles} onReset={handleResetFilters} onExport={handleExportDataCsv} onRefresh={()=>loadData(true)} loading={refreshing} sortBy={sortBy} setSortBy={setSortBy}/>
+                    <div className="min-w-0 space-y-3">
+                      <p className="text-xs font-semibold text-slate-500">{filteredAndSortedList.length} de {organismos.length} organismos</p>
+                      <MatrixTable organismos={filteredAndSortedList} onEdit={(user?.tableroAcceso === 'admin' || user?.tableroAcceso === 'editor') ? setEditingOrg : undefined} comparedOrgIds={comparedOrgIds} onToggleCompare={(id) => setComparedOrgIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : prev.length < 3 ? [...prev, id] : prev)} staleCount={organismos.filter(isStale).length} staleOnly={filters.staleOnly} onToggleStaleFilter={()=>setFilters(prev=>({...prev,staleOnly:!prev.staleOnly}))}/>
+                    </div>
+                  </div>
+                </div>}
+
+                {activeTab === 'madurez' && <DigitalMaturityChart organismos={filteredAndSortedList}/>}
 
                 {/* Sub-Views container based on Active Tab */}
                 {(activeTab === 'history' || activeTab === 'users') && <div className="min-h-[400px]">

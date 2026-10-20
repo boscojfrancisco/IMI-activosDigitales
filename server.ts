@@ -582,7 +582,10 @@ app.post('/api/digital-index/organismos/:id/verification', requireAuth, checkRol
     const [org] = await db.select().from(organismos).where(eq(organismos.id, organismoId)).limit(1);
     if (!org) return res.status(404).json({error:'Organismo no encontrado.'});
     const observations = await db.select().from(digitalObservaciones).where(eq(digitalObservaciones.organismoId, organismoId));
-    const latest = observations.filter(row => row.variableId === variableId).sort((a,b)=>b.fechaObservacion.localeCompare(a.fechaObservacion)||b.id-a.id)[0];
+    const latest = observations.filter(row => row.variableId === variableId).sort((a,b)=>
+      b.fechaObservacion.localeCompare(a.fechaObservacion) ||
+      (a.fuente === 'V' && b.fuente !== 'V' ? -1 : b.fuente === 'V' && a.fuente !== 'V' ? 1 : b.id - a.id)
+    )[0];
     const username = req.user?.username || 'Usuario';
     const txResult = await db.transaction(async tx => {
       let level = latest?.nivel ?? 0;
@@ -591,10 +594,13 @@ app.post('/api/digital-index/organismos/:id/verification', requireAuth, checkRol
       if (latest && (estado === 'sin_evidencia' || latest.notas?.includes('[base monitor anterior]'))) {
         await tx.insert(digitalObservaciones).values({ organismoId, variableId, nivel:level, fuente:latest.fuente, fechaObservacion:new Date().toISOString().slice(0,10), evidencia:estado === 'confirmado' ? latest.evidencia : null, notas:`Verificación ${estado === 'confirmado' ? 'confirmada' : 'sin evidencia'} por ${username}.${latest.notas ? ` Dato de origen: ${latest.notas.replaceAll('[base monitor anterior]','').replaceAll('[carga integral]','').trim()}` : ''}`, usuario:username });
       }
-      const [prior] = await tx.select().from(digitalVerificaciones).where(eq(digitalVerificaciones.organismoId, organismoId)).limit(1);
-      const variables = {...(prior?.variables || {}), [variableId]:{estado,nivel:level,usuario:username,fecha:new Date().toISOString()}};
-      await tx.insert(digitalVerificaciones).values({organismoId,variables,cerradoPor:null,cerradoAt:null}).onConflictDoUpdate({target:digitalVerificaciones.organismoId,set:{variables,cerradoPor:null,cerradoAt:null}});
-      return {variables};
+      const reviewEntry = {estado,nivel:level,usuario:username,fecha:new Date().toISOString()};
+      const variablePatch = {[variableId]:reviewEntry};
+      const [saved] = await tx.insert(digitalVerificaciones).values({organismoId,variables:variablePatch,cerradoPor:null,cerradoAt:null}).onConflictDoUpdate({
+        target:digitalVerificaciones.organismoId,
+        set:{variables:sql`${digitalVerificaciones.variables} || ${JSON.stringify(variablePatch)}::jsonb`,cerradoPor:null,cerradoAt:null}
+      }).returning();
+      return {variables:saved.variables};
     });
     if ('error' in txResult) return res.status(400).json({error:txResult.error});
     res.json(txResult);
@@ -638,16 +644,19 @@ app.post('/api/digital-index/observations', requireAuth, checkRole(['admin', 'ed
     return res.status(400).json({ error: 'El criterio del nivel 3 de A3 está pendiente de definición.' });
   }
   try {
-    const [row] = await db.insert(digitalObservaciones).values({
-      organismoId: Number(organismoId), variableId, nivel, fuente, fechaObservacion,
-      evidencia: evidencia || null, notas: notas || null, usuario: req.user?.username || 'Usuario'
-    }).returning();
-    const [review] = await db.select().from(digitalVerificaciones).where(eq(digitalVerificaciones.organismoId, Number(organismoId))).limit(1);
-    if (review) {
-      const variables = {...review.variables};
-      delete variables[variableId];
-      await db.update(digitalVerificaciones).set({variables,cerradoPor:null,cerradoAt:null}).where(eq(digitalVerificaciones.organismoId, Number(organismoId)));
-    }
+    const row = await db.transaction(async tx => {
+      const [inserted] = await tx.insert(digitalObservaciones).values({
+        organismoId: Number(organismoId), variableId, nivel, fuente, fechaObservacion,
+        evidencia: evidencia || null, notas: notas || null, usuario: req.user?.username || 'Usuario'
+      }).returning();
+      const [review] = await tx.select().from(digitalVerificaciones).where(eq(digitalVerificaciones.organismoId, Number(organismoId))).limit(1);
+      if (review) {
+        const variables = {...review.variables};
+        delete variables[variableId];
+        await tx.update(digitalVerificaciones).set({variables,cerradoPor:null,cerradoAt:null}).where(eq(digitalVerificaciones.organismoId, Number(organismoId)));
+      }
+      return inserted;
+    });
     res.status(201).json(row);
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'No se pudo guardar la observación.' });
@@ -659,29 +668,34 @@ app.post('/api/digital-index/observations/import', requireAuth, checkRole(['admi
   if (!Array.isArray(rows) || rows.length === 0 || rows.length > 1000) {
     return res.status(400).json({ error: 'El archivo debe incluir entre 1 y 1000 observaciones.' });
   }
-  const allOrgs = await db.select({ id: organismos.id }).from(organismos);
-  const orgIds = new Set(allOrgs.map(org => org.id));
-  const invalid: string[] = [];
-  const values = rows.map((row: any, index: number) => {
-    const variable = catalog.find((item: any) => item.id === row.variableId);
-    const date = row.fechaObservacion;
-    const valid = variable && orgIds.has(Number(row.organismoId)) && Number.isInteger(Number(row.nivel)) && Number(row.nivel) >= 0 && Number(row.nivel) <= 3 &&
-      ['W', 'S', 'V'].includes(row.fuente) && /^\d{4}-\d{2}-\d{2}$/.test(date || '') &&
-      !(variable.scale === 'binary' && Number(row.nivel) !== 0 && Number(row.nivel) !== 3) &&
-      !(row.variableId === 'B1' && Number(row.nivel) !== 0 && Number(row.nivel) !== 3) &&
-      !(row.variableId === 'A3' && Number(row.nivel) === 3);
-    if (!valid) { invalid.push(`Fila ${index + 2}: datos inválidos o nivel no admitido.`); return null; }
-    return { organismoId: Number(row.organismoId), variableId: row.variableId, nivel: Number(row.nivel), fuente: row.fuente, fechaObservacion: date, evidencia: row.evidencia || null, notas: row.notas || null, usuario: req.user?.username || 'Usuario' };
-  });
-  if (invalid.length) return res.status(400).json({ error: invalid.slice(0, 20).join(' '), invalidCount: invalid.length });
   try {
-    await db.insert(digitalObservaciones).values(values as Array<NonNullable<typeof values[number]>>);
-    for (const key of new Set(values.map((row:any)=>`${row.organismoId}:${row.variableId}`))) {
-      const [organismoId, variableId] = key.split(':');
-      const [review] = await db.select().from(digitalVerificaciones).where(eq(digitalVerificaciones.organismoId, Number(organismoId))).limit(1);
-      if (review) { const variables = {...review.variables}; delete variables[variableId]; await db.update(digitalVerificaciones).set({variables,cerradoPor:null,cerradoAt:null}).where(eq(digitalVerificaciones.organismoId, Number(organismoId))); }
-    }
-    res.status(201).json({ inserted: values.length });
+    const allOrgs = await db.select({ id: organismos.id }).from(organismos);
+    const orgIds = new Set(allOrgs.map(org => org.id));
+    const invalid: string[] = [];
+    const values = rows.map((row: any, index: number) => {
+      const variable = catalog.find((item: any) => item.id === row.variableId);
+      const date = row.fechaObservacion;
+      const rawLevel = row.nivel;
+      const level = rawLevel === null || rawLevel === undefined || String(rawLevel).trim() === '' ? NaN : Number(rawLevel);
+      const valid = variable && orgIds.has(Number(row.organismoId)) && Number.isInteger(level) && level >= 0 && level <= 3 &&
+        ['W', 'S', 'V'].includes(row.fuente) && /^\d{4}-\d{2}-\d{2}$/.test(date || '') &&
+        !(variable.scale === 'binary' && level !== 0 && level !== 3) &&
+        !(row.variableId === 'B1' && level !== 0 && level !== 3) &&
+        !(row.variableId === 'A3' && level === 3);
+      if (!valid) { invalid.push(`Fila ${index + 2}: datos inválidos o nivel no admitido.`); return null; }
+      return { organismoId: Number(row.organismoId), variableId: row.variableId, nivel: level, fuente: row.fuente, fechaObservacion: date, evidencia: row.evidencia || null, notas: row.notas || null, usuario: req.user?.username || 'Usuario' };
+    });
+    if (invalid.length) return res.status(400).json({ error: invalid.slice(0, 20).join(' '), invalidCount: invalid.length });
+    const validValues = values as Array<NonNullable<typeof values[number]>>;
+    await db.transaction(async tx => {
+      await tx.insert(digitalObservaciones).values(validValues);
+      for (const key of new Set(validValues.map(row=>`${row.organismoId}:${row.variableId}`))) {
+        const [organismoId, variableId] = key.split(':');
+        const [review] = await tx.select().from(digitalVerificaciones).where(eq(digitalVerificaciones.organismoId, Number(organismoId))).limit(1);
+        if (review) { const variables = {...review.variables}; delete variables[variableId]; await tx.update(digitalVerificaciones).set({variables,cerradoPor:null,cerradoAt:null}).where(eq(digitalVerificaciones.organismoId, Number(organismoId))); }
+      }
+    });
+    res.status(201).json({ inserted: validValues.length });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'No se pudo importar el archivo.' });
   }
@@ -787,7 +801,7 @@ app.put('/api/organismos/:id', requireAuth, checkRole(['admin', 'editor']), asyn
       'seguimientoTramites', 'atencionDigital', 'capacitacion', 'capacitacionDigital',
       'fuente', 'nivelConfianza', 'completitud',
       'firmaDigital', 'analisisProcesos', 'tieneDoco', 'usaSiif',
-      'tramitesMiCorrientes',
+      'tramitesMiCorrientes', 'resenaSiif', 'resenaFirma', 'resenaIa', 'chatbotResena',
       'updatedAt'
     ];
 

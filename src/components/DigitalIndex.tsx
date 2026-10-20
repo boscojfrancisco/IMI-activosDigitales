@@ -93,9 +93,29 @@ export default function DigitalIndex({ organismos, token, role, view='index' }: 
     setObservations(obs); setCuts(closed);
     if(canEdit&&token)setVerification(await request<VerificationSummary>('/api/digital-index/verifications',token));
   };
-  useEffect(()=>{ refresh().catch(e=>setError(e.message)); },[]);
+  const refreshAfterSave=async(message:string)=>{
+    try{await refresh();setNotice(message);}
+    catch{setNotice(`${message} El dato quedó guardado, pero no se pudo actualizar la vista. Recargá la página para verlo.`);}
+  };
+  useEffect(()=>{ refresh().catch(e=>setError(e.message)); },[token,canEdit]);
   useEffect(()=>{if(canEdit&&token)Promise.all([request<Omit<BaselinePreview,'completeApplied'|'completeCandidates'|'completeByVariable'>>('/api/digital-index/legacy-baseline',token),request<{applied:boolean;candidates:number;byVariable:Record<string,number>}>('/api/digital-index/legacy-complete',token)]).then(([base,complete])=>setBaseline({...base,completeApplied:complete.applied,completeCandidates:complete.candidates,completeByVariable:complete.byVariable})).catch(e=>setError(e.message));},[canEdit,token]);
-  useEffect(()=>{setEditingReview(null);if(selectedId!==null)request<Extras>(`/api/digital-index/organismos/${selectedId}/extra`,token).then(setExtras).catch(e=>setError(e.message));},[selectedId]);
+  useEffect(()=>{
+    setEditingReview(null);
+    setExtras({tramites:[],visitas:[]});
+    setForm({variableId:'A1',nivel:0,fuente:'W',fechaObservacion:dateToday(),evidencia:'',notas:''});
+    setVisitForm({fecha:dateToday(),observaciones:''});
+    if(selectedId===null){setTramiteForm({fecha:dateToday(),nativos:0,integrados:0,fueraMiCorrientes:0,integradosLinks:'',fueraMiCorrientesLinks:''});return;}
+    let active=true;
+    request<Extras>(`/api/digital-index/organismos/${selectedId}/extra`,token)
+      .then(data=>{
+        if(!active)return;
+        setExtras(data);
+        const latest=data.tramites[0];
+        setTramiteForm({fecha:dateToday(),nativos:latest?.nativos??0,integrados:latest?.integrados??0,fueraMiCorrientes:latest?.fueraMiCorrientes??0,integradosLinks:(latest?.integradosLinks??[]).join('\n'),fueraMiCorrientesLinks:(latest?.fueraMiCorrientesLinks??[]).join('\n')});
+      })
+      .catch(e=>{if(active)setError(e.message);});
+    return()=>{active=false;};
+  },[selectedId,token]);
   useEffect(()=>{setSelectedId(null);setRankingPage(0);},[view]);
 
   const model=useMemo(()=>{
@@ -131,23 +151,23 @@ export default function DigitalIndex({ organismos, token, role, view='index' }: 
     setError('');setNotice('');setBusy(true);
     try{
       await request('/api/digital-index/observations',token,{method:'POST',body:JSON.stringify({organismoId:selected.org.id,...form,nivel:Number(form.nivel)})});
-      await refresh();setNotice('Observación agregada al historial.');setForm(f=>({...f,evidencia:'',notas:''}));
+      await refreshAfterSave('Observación agregada al historial.');setForm(f=>({...f,evidencia:'',notas:''}));
     }catch(e:any){setError(e.message)}finally{setBusy(false)}
   };
   const reviewVariable=async(variableId:string,estado:'confirmado'|'sin_evidencia')=>{
     if(!selected)return;setBusy(true);setError('');setNotice('');
-    try{await request(`/api/digital-index/organismos/${selected.org.id}/verification`,token,{method:'POST',body:JSON.stringify({variableId,estado})});await refresh();setEditingReview(null);setNotice('Verificación registrada.');}
+    try{await request(`/api/digital-index/organismos/${selected.org.id}/verification`,token,{method:'POST',body:JSON.stringify({variableId,estado})});setEditingReview(null);await refreshAfterSave('Verificación registrada.');}
     catch(e:any){setError(e.message)}finally{setBusy(false)}
   };
   const closeVerification=async()=>{
     if(!selected)return;setBusy(true);setError('');setNotice('');
-    try{await request(`/api/digital-index/organismos/${selected.org.id}/verification/close`,token,{method:'POST',body:'{}'});await refresh();setNotice('Verificación del organismo cerrada.');}
+    try{await request(`/api/digital-index/organismos/${selected.org.id}/verification/close`,token,{method:'POST',body:'{}'});await refreshAfterSave('Verificación del organismo cerrada.');}
     catch(e:any){setError(e.message)}finally{setBusy(false)}
   };
   const cleanupProvisional=async()=>{
     if(!window.confirm('Se eliminarán únicamente las observaciones marcadas como base provisoria. Las observaciones confirmadas, corregidas y el registro de verificación se conservarán. ¿Continuar?'))return;
     setBusy(true);setError('');setNotice('');
-    try{const result=await request<{deleted:number}>('/api/digital-index/provisional-observations',token,{method:'DELETE'});await refresh();setNotice(`Se retiraron ${result.deleted} observaciones provisorias.`);}
+    try{const result=await request<{deleted:number}>('/api/digital-index/provisional-observations',token,{method:'DELETE'});await refreshAfterSave(`Se retiraron ${result.deleted} observaciones provisorias.`);}
     catch(e:any){setError(e.message)}finally{setBusy(false)}
   };
   const saveExtra=async(kind:'tramites'|'visitas')=>{
@@ -155,12 +175,14 @@ export default function DigitalIndex({ organismos, token, role, view='index' }: 
     try{
       const payload=kind==='tramites'?{...tramiteForm,integradosLinks:parseLinkList(tramiteForm.integradosLinks),fueraMiCorrientesLinks:parseLinkList(tramiteForm.fueraMiCorrientesLinks)}:visitForm;
       await request(`/api/digital-index/organismos/${selected.org.id}/${kind}`,token,{method:'POST',body:JSON.stringify(payload)});
-      const data=await request<Extras>(`/api/digital-index/organismos/${selected.org.id}/extra`,token);setExtras(data);setNotice(kind==='tramites'?'Detalle de trámites agregado.':'Visita agregada al historial.');
+      const success=kind==='tramites'?'Detalle de trámites agregado.':'Visita agregada al historial.';
+      try{const data=await request<Extras>(`/api/digital-index/organismos/${selected.org.id}/extra`,token);setExtras(data);setNotice(success);}
+      catch{setNotice(`${success} El dato quedó guardado, pero no se pudo actualizar la vista. Recargá la página para verlo.`);}
     }catch(e:any){setError(e.message)}finally{setBusy(false)}
   };
   const closeCut=async()=>{
     setError('');setNotice('');setBusy(true);
-    try{await request('/api/digital-index/cuts',token,{method:'POST',body:JSON.stringify({nombre:cutName,fecha:cutDate})});await refresh();setNotice('Corte cerrado y congelado.');setCutName('')}
+    try{await request('/api/digital-index/cuts',token,{method:'POST',body:JSON.stringify({nombre:cutName,fecha:cutDate})});await refreshAfterSave('Corte cerrado y congelado.');setCutName('')}
     catch(e:any){setError(e.message)}finally{setBusy(false)}
   };
   const migrateBaseline=async()=>{
@@ -188,9 +210,9 @@ export default function DigitalIndex({ organismos, token, role, view='index' }: 
       const cOrg=col('organismoid','organismo'),cVar=col('variableid','variable'),cLevel=col('nivel'),cSource=col('fuente'),cDate=col('fechaobservacion','fecha'),cEvidence=col('evidencia'),cNotes=col('notas','observaciones');
       if([cOrg,cVar,cLevel,cSource,cDate].some(i=>i<0))throw new Error('Faltan columnas requeridas: organismo_id, variable_id, nivel, fuente y fecha_observacion.');
       const byName=new Map(organismos.map(org=>[org.nombre.trim().toLocaleLowerCase(),org.id]));
-      const rows=table.slice(1).map(line=>{const get=(i:number)=>i<0?'':line[i]??'';const rawOrg=get(cOrg);const orgId=Number(rawOrg)||byName.get(rawOrg.trim().toLocaleLowerCase());return {organismoId:orgId,variableId:get(cVar).trim().toUpperCase(),nivel:Number(get(cLevel)),fuente:get(cSource).trim().toUpperCase(),fechaObservacion:get(cDate).trim(),evidencia:get(cEvidence),notas:get(cNotes)};});
+      const rows=table.slice(1).map(line=>{const get=(i:number)=>i<0?'':line[i]??'';const rawOrg=get(cOrg);const rawLevel=get(cLevel).trim();const numericLevel=Number(rawLevel);const orgId=Number(rawOrg)||byName.get(rawOrg.trim().toLocaleLowerCase());return {organismoId:orgId,variableId:get(cVar).trim().toUpperCase(),nivel:rawLevel===''?null:Number.isFinite(numericLevel)?numericLevel:rawLevel,fuente:get(cSource).trim().toUpperCase(),fechaObservacion:get(cDate).trim(),evidencia:get(cEvidence),notas:get(cNotes)};});
       const result=await request<{inserted:number}>('/api/digital-index/observations/import',token,{method:'POST',body:JSON.stringify({rows})});
-      await refresh();setNotice(`Se importaron ${result.inserted} observaciones.`);
+      await refreshAfterSave(`Se importaron ${result.inserted} observaciones.`);
     }catch(e:any){setError(e.message)}finally{setBusy(false);if(importInput.current)importInput.current.value='';}
   };
   const exportCsv=(cut?:Cut)=>{
@@ -213,14 +235,13 @@ export default function DigitalIndex({ organismos, token, role, view='index' }: 
     <div className="grid gap-4 lg:grid-cols-2"><section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><div><h3 className="font-bold">Trámites en Mi Corrientes y otros canales</h3><p className="mt-1 text-xs text-slate-500">Registrá la cantidad vigente y agregá enlaces para respaldar los trámites integrados o externos.</p></div><details className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300"><summary className="flex cursor-pointer items-center gap-2 font-semibold"><Info size={14}/> ¿Qué significa cada categoría y para qué se piden enlaces?</summary><ul className="mt-2 list-disc space-y-1 pl-4"><li><strong>Nativos:</strong> se inician y completan dentro de Mi Corrientes.</li><li><strong>Integrados o federados:</strong> Mi Corrientes deriva a otro sistema conectado. El enlace permite identificarlo.</li><li><strong>Online fuera de Mi Corrientes:</strong> el organismo ofrece el trámite en su propio sitio o en otra plataforma. El enlace sirve como evidencia.</li></ul><p className="mt-2">Cargá una URL por línea. Así se puede comprobar qué trámites forman parte de cada cantidad.</p></details>{extras.tramites[0]&&<div className="mt-3 rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-800"><p><strong>Último registro ({extras.tramites[0].fecha}):</strong> {extras.tramites[0].nativos} nativos · {extras.tramites[0].integrados} integrados o federados · {extras.tramites[0].fueraMiCorrientes} online fuera de Mi Corrientes.</p><div className="mt-2 grid gap-2 sm:grid-cols-2">{([{title:'Enlaces integrados o federados',links:extras.tramites[0].integradosLinks??[]},{title:'Enlaces fuera de Mi Corrientes',links:extras.tramites[0].fueraMiCorrientesLinks??[]}] as const).map(group=><div key={group.title}><p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{group.title}</p>{group.links.length?<ul className="mt-1 space-y-1">{group.links.map(link=><li key={link} className="truncate"><a href={link} target="_blank" rel="noreferrer" className="text-blue-700 underline dark:text-blue-300">{link}</a></li>)}</ul>:<p className="mt-1 text-xs text-slate-400">Sin enlaces cargados</p>}</div>)}</div></div>}{canEdit&&<div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800"><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">Fecha del relevamiento<input className="field mt-1" type="date" value={tramiteForm.fecha} onChange={e=>setTramiteForm({...tramiteForm,fecha:e.target.value})}/></label>{(['nativos','integrados','fueraMiCorrientes'] as const).map((key,i)=><label key={key} className="text-xs font-semibold">{['Trámites nativos','Integrados o federados','Online fuera de Mi Corrientes'][i]}<input className="field mt-1" type="number" min="0" value={tramiteForm[key]} onChange={e=>setTramiteForm({...tramiteForm,[key]:Number(e.target.value)})}/></label>)}</div><div className="grid gap-3 sm:grid-cols-2"><label className="text-xs font-semibold">Links integrados o federados<span className="mt-1 block font-normal text-slate-500">Una URL por línea; pegá la dirección del sistema o trámite.</span><textarea className="field mt-1 min-h-20" value={tramiteForm.integradosLinks} onChange={e=>setTramiteForm({...tramiteForm,integradosLinks:e.target.value})} placeholder="https://..."/></label><label className="text-xs font-semibold">Links online fuera de Mi Corrientes<span className="mt-1 block font-normal text-slate-500">Una URL por línea; pegá la dirección pública del trámite.</span><textarea className="field mt-1 min-h-20" value={tramiteForm.fueraMiCorrientesLinks} onChange={e=>setTramiteForm({...tramiteForm,fueraMiCorrientesLinks:e.target.value})} placeholder="https://..."/></label></div><button disabled={busy} onClick={()=>saveExtra('tramites')} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Guardar cantidades y enlaces</button></div>}</section>
       <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><h3 className="font-bold">Historial de visitas</h3>{extras.visitas.length?<ul className="mt-2 space-y-2">{extras.visitas.map(visit=><li key={visit.id} className="rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-950"><strong>{visit.fecha}</strong>{visit.observaciones&&<p className="mt-1 text-slate-600 dark:text-slate-300">{visit.observaciones}</p>}</li>)}</ul>:<p className="mt-2 text-sm text-slate-500">Todavía no hay visitas registradas.</p>}{canEdit&&<div className="mt-3 space-y-2"><input className="field" type="date" value={visitForm.fecha} onChange={e=>setVisitForm({...visitForm,fecha:e.target.value})}/><textarea className="field" placeholder="Procesos relevados o rediseñados" value={visitForm.observaciones} onChange={e=>setVisitForm({...visitForm,observaciones:e.target.value})}/><button disabled={busy} onClick={()=>saveExtra('visitas')} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white">Registrar visita</button></div>}</section></div>
     {canEdit&&<div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><h3 className="font-bold">Agregar observación</h3><p className="mb-4 text-xs text-slate-500">Cada carga agrega un registro nuevo; no reemplaza observaciones anteriores.</p><div className="grid gap-3 md:grid-cols-2">
-      <label className="text-xs font-semibold">Variable<select className="field" value={form.variableId} onChange={e=>setForm({...form,variableId:e.target.value})}>{weights.map(v=><option key={v.id} value={v.id}>{v.id} · {v.name}</option>)}</select></label>
-      <label className="text-xs font-semibold">Nivel<select className="field" value={form.nivel} onChange={e=>setForm({...form,nivel:Number(e.target.value)})}>{(form.variableId==='A5'||form.variableId==='B1'?[0,3]:[0,1,2,3]).map(n=><option key={n} value={n}>Nivel {n} — {weights.find(v=>v.id===form.variableId)?.levels[String(n) as keyof typeof weights[number]['levels']]}</option>)}</select></label>
+      <label className="text-xs font-semibold">Variable<select className="field" value={form.variableId} onChange={e=>setForm({...form,variableId:e.target.value,nivel:0})}>{weights.map(v=><option key={v.id} value={v.id}>{v.id} · {v.name}</option>)}</select></label>
+      <label className="text-xs font-semibold">Nivel<select className="field" value={form.nivel} onChange={e=>setForm({...form,nivel:Number(e.target.value)})}>{(form.variableId==='A5'||form.variableId==='B1'?[0,3]:form.variableId==='A3'?[0,1,2]:[0,1,2,3]).map(n=><option key={n} value={n}>Nivel {n} — {weights.find(v=>v.id===form.variableId)?.levels[String(n) as keyof typeof weights[number]['levels']]}</option>)}</select></label>
       <label className="text-xs font-semibold">Fuente<select className="field" value={form.fuente} onChange={e=>setForm({...form,fuente:e.target.value})}><option value="W">W · Web y Mi Corrientes</option><option value="S">S · Sistemas provinciales</option><option value="V">V · Visita al organismo</option></select></label>
       <label className="text-xs font-semibold">Fecha de observación<input className="field" type="date" value={form.fechaObservacion} onChange={e=>setForm({...form,fechaObservacion:e.target.value})}/></label>
       <label className="text-xs font-semibold">Evidencia (enlace)<input className="field" type="url" value={form.evidencia} onChange={e=>setForm({...form,evidencia:e.target.value})} placeholder="https://…"/></label>
       <label className="text-xs font-semibold">Notas<textarea className="field" value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})}/></label></div>
-      {form.variableId==='A3'&&form.nivel===3&&<p className="mt-2 text-xs text-amber-700">El nivel 3 no se puede cargar hasta que se defina su criterio.</p>}
-      <button disabled={busy||(form.variableId==='A3'&&form.nivel===3)} onClick={saveObservation} className="mt-4 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Guardar observación</button>
+      <button disabled={busy} onClick={saveObservation} className="mt-4 rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">Guardar observación</button>
     </div>}
     {error&&<p className="text-sm text-red-700">{error}</p>}{notice&&<p className="text-sm text-emerald-700">{notice}</p>}
   </section>;

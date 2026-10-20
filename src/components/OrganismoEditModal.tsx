@@ -57,12 +57,13 @@ export default function OrganismoEditModal({ organismo, onClose, onSaved, token 
         },
         body: JSON.stringify(formData)
       });
-      if (!res.ok) throw new Error('Failed to update');
-      const updated = await res.json();
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || `No se pudo guardar el organismo (HTTP ${res.status}).`);
+      const updated = payload as Organismo;
       onSaved(updated);
     } catch (e) {
       console.error(e);
-      alert('Error al guardar. Intenta nuevamente.');
+      alert(e instanceof Error ? e.message : 'Error al guardar. Intenta nuevamente.');
     } finally {
       setIsSaving(false);
     }
