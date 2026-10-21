@@ -60,7 +60,7 @@ export default function App() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   
   // UI views and themes
-  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history' | 'users' | 'index' | 'organismos' | 'madurez'>('index');
+  const [activeTab, setActiveTab] = useState<'matrix' | 'charts' | 'history' | 'users' | 'index' | 'organismos' | 'madurez'>('matrix');
   
   // Auth state
   const [token, setToken] = useState<string | null>(null);
@@ -475,7 +475,7 @@ export default function App() {
                     localStorage.removeItem('imi_auth_user');
                     setToken(null);
                     setUser(null);
-                    setActiveTab('index');
+                    setActiveTab('matrix');
                   }}
                   className="p-2.5 rounded-xl bg-white hover:bg-rose-50 hover:text-rose-600 dark:bg-slate-900 dark:hover:bg-rose-955/20 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-350 transition shadow-sm cursor-pointer flex items-center justify-center"
                   title="Cerrar sesión"
@@ -540,13 +540,6 @@ export default function App() {
                   {/* Sliding Tabs */}
                   <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl w-full sm:w-auto relative select-none">
                     <button
-                      onClick={() => setActiveTab('index')}
-                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${activeTab === 'index' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
-                    >
-                      <Sparkle className="h-3.5 w-3.5" />
-                      Índice provincial
-                    </button>
-                    <button
                       onClick={() => setActiveTab('matrix')}
                       className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${activeTab === 'matrix' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
                     >
@@ -559,6 +552,13 @@ export default function App() {
                     >
                       <BarChart3 className="h-3.5 w-3.5" />
                       Métricas
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('index')}
+                      className={`relative z-10 flex-1 sm:flex-initial px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition cursor-pointer ${activeTab === 'index' ? 'text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                    >
+                      <Sparkle className="h-3.5 w-3.5" />
+                      Índice provincial
                     </button>
                     <button
                       onClick={() => setActiveTab('organismos')}
