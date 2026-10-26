@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+command_text=${SSH_ORIGINAL_COMMAND:-}
+case "$command_text" in
+  "deploy-activos "*) revision=${command_text#deploy-activos } ;;
+  *) exit 64 ;;
+esac
+
+case "$revision" in
+  ''|*[!a-f0-9]*) exit 64 ;;
+esac
+[ "${#revision}" -eq 40 ] || exit 64
+
+exec /usr/bin/sudo -n -u ubuntu /usr/local/sbin/imi-activos-deploy-runner "$revision"

@@ -1,0 +1,64 @@
+name: Deploy IMI Activos to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: imi-activos-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run build
+
+  deploy:
+    name: Deploy to EC2
+    needs: build
+    if: ${{ github.ref == 'refs/heads/main' && vars.IMI_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production-ssh
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.IMI_ACTIVOS_DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/imi_activos_deploy"
+          chmod 600 "$HOME/.ssh/imi_activos_deploy"
+          printf '%s\n' '54.94.131.196 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAIZduAuABAwlSpVZGaBp9eW+4qPBReOrNkvxWphbyy9' > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Deploy current main revision
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: >-
+          ssh -i "$HOME/.ssh/imi_activos_deploy"
+          -o BatchMode=yes
+          -o IdentitiesOnly=yes
+          -o StrictHostKeyChecking=yes
+          -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+          -p 22 imi-activos-deploy@54.94.131.196
+          "deploy-activos $GITHUB_SHA"
