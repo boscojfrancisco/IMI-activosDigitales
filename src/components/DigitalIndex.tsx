@@ -257,6 +257,16 @@ export default function DigitalIndex({ organismos, token, role, view='index' }: 
   if(view==='metrics')return <section className="space-y-5">
     <div><p className="text-xs font-bold uppercase tracking-widest text-blue-700">Lectura del índice</p><h2 className="mt-1 text-2xl font-extrabold">Métricas de digitalización</h2><p className="mt-1 text-sm text-slate-500">Indicadores calculados desde las mismas observaciones del índice provincial.</p></div>
     <div className="grid gap-4 md:grid-cols-3"><article className="rounded-2xl bg-slate-900 p-5 text-white"><p className="text-xs uppercase tracking-wider text-slate-300">Índice provincial</p><div className="mt-2 text-4xl font-extrabold">{fmt(model.index)}<span className="text-lg"> / 100</span></div><p className="mt-1 text-sm text-blue-200">{category(model.index)}</p></article><ScoreBar title="A · Servicios al ciudadano" score={model.dimensionA} max={60}/><ScoreBar title="B · Gestión interna y capacidades" score={model.dimensionB} max={40}/></div>
+    <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+      <div>
+        <h3 className="font-bold">Organismos por encima y debajo del promedio</h3>
+        <p className="mt-1 text-xs text-slate-500">Compara los 41 organismos con el promedio provincial de cada dimensión, redondeado a un decimal. Los niveles sin observar computan como 0.</p>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <DimensionComparisonCard dimension="A" rows={model.rows}/>
+        <DimensionComparisonCard dimension="B" rows={model.rows}/>
+      </div>
+    </section>
     <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><h3 className="font-bold">Organismos por categoría</h3><div className="mt-4 space-y-3">{categoryCounts.map((item,index)=><div key={item.name}><div className="mb-1 flex justify-between text-sm"><span>{item.name}</span><span className="text-slate-500">{item.count} de {model.rows.length}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className={`h-full rounded-full ${['bg-slate-400','bg-amber-500','bg-blue-500','bg-emerald-500'][index]}`} style={{width:`${model.rows.length?item.count/model.rows.length*100:0}%`}}/></div></div>)}</div></div>
       <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><h3 className="font-bold">Cobertura por variable</h3><p className="mt-1 text-xs text-slate-500">Una observación puede registrar nivel 0. El objetivo se indica en cada variable.</p><div className="mt-3 space-y-2">{model.coverage.map(({variable,count,observed})=><div key={variable.id} className="border-b border-slate-100 py-2 text-sm dark:border-slate-800"><div className="flex items-center justify-between gap-2"><span className="font-medium">{variable.id} · {variable.name}</span><span className="text-[10px] text-slate-500">Objetivo: {variable.id==='B1'?'nivel 3 (todo el organismo)':variable.scale==='binary'?'nivel 3':'nivel 2+'}</span></div><div className="mt-1.5 grid grid-cols-2 gap-2 text-xs"><span className="rounded-md bg-slate-50 px-2 py-1.5 text-slate-700 dark:bg-slate-950 dark:text-slate-200">Con observación: <strong>{observed}/41</strong></span><span className="rounded-md bg-blue-50 px-2 py-1.5 text-blue-900 dark:bg-blue-950/50 dark:text-blue-100">Cumplen objetivo: <strong>{count}/41</strong></span></div></div>)}</div></div>
     </div>
@@ -278,5 +288,80 @@ export default function DigitalIndex({ organismos, token, role, view='index' }: 
 }
 
 function ScoreBar({title,score,max}:{title:string;score:number;max:number}){return <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><div className="flex justify-between gap-3"><span className="text-sm font-semibold">{title}</span><span className="font-mono text-sm font-bold">{fmt(score)} <span className="text-xs text-slate-400">/ {max}</span></span></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600" style={{width:`${Math.max(0,Math.min(100,score/max*100))}%`}}/></div></div>}
+
+function DimensionComparisonCard({dimension,rows}:{dimension:'A'|'B';rows:Array<{org:Organismo;dimensionA:number;dimensionB:number}>}){
+  const isCitizen=dimension==='A';
+  const scoreKey=isCitizen?'dimensionA':'dimensionB';
+  const max=isCitizen?60:40;
+  const title=isCitizen?'Servicios al ciudadano':'Gestión interna y capacidades';
+  const mean=rows.length?rows.reduce((sum,row)=>sum+row[scoreKey],0)/rows.length:0;
+  const threshold=Math.round(mean*10)/10;
+  const ranked=[...rows].sort((a,b)=>b[scoreKey]-a[scoreKey]);
+  const above=ranked.filter(row=>row[scoreKey]>threshold).length;
+  const below=ranked.filter(row=>row[scoreKey]<threshold).length;
+  const equal=ranked.length-above-below;
+  const groups=rows.reduce<Record<string,typeof rows>>((byType,row)=>{
+    const type=row.org.tipo||'Sin nivel informado';
+    (byType[type]??=[]).push(row);
+    return byType;
+  },{});
+  const border=isCitizen?'border-blue-200 dark:border-blue-900':'border-emerald-200 dark:border-emerald-900';
+  const heading=isCitizen?'text-blue-900 dark:text-blue-100':'text-emerald-900 dark:text-emerald-100';
+
+  return <article className={`overflow-hidden rounded-xl border ${border}`}>
+    <div className={`flex flex-wrap items-start justify-between gap-3 px-4 py-3 ${isCitizen?'bg-blue-50 dark:bg-blue-950/40':'bg-emerald-50 dark:bg-emerald-950/40'}`}>
+      <div><h4 className={`text-sm font-bold ${heading}`}>{dimension} · {title}</h4><p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Promedio: <strong>{fmt(threshold)} / {max}</strong> · {ranked.length} organismos</p></div>
+      <span className="rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">Puntaje máximo {max}</span>
+    </div>
+    <div className="grid grid-cols-3 gap-2 p-3 text-center text-[11px]">
+      <div className="rounded-lg bg-emerald-50 px-2 py-2 text-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-200"><strong className="block text-base">{above}</strong>Por encima</div>
+      <div className="rounded-lg bg-slate-100 px-2 py-2 text-slate-700 dark:bg-slate-800 dark:text-slate-200"><strong className="block text-base">{equal}</strong>En el promedio</div>
+      <div className="rounded-lg bg-rose-50 px-2 py-2 text-rose-900 dark:bg-rose-950/50 dark:text-rose-200"><strong className="block text-base">{below}</strong>Por debajo</div>
+    </div>
+    <div className="max-h-80 divide-y divide-slate-100 overflow-y-auto px-3 dark:divide-slate-800" aria-label={`Puntajes de la dimensión ${dimension}`}>
+      {ranked.map((row,index)=>{
+        const score=row[scoreKey];
+        const status=score>threshold?'Por encima':score<threshold?'Por debajo':'En el promedio';
+        const statusClass=score>threshold?'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200':score<threshold?'bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200':'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
+        return <div key={row.org.id} className="py-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+            <span className="min-w-0 flex-1 truncate"><span className="mr-2 text-slate-400">{index+1}.</span><strong>{row.org.nombre}</strong></span>
+            <span className="font-mono font-semibold">{fmt(score)} / {max}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClass}`}>{status}</span>
+          </div>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className={`h-full rounded-full ${score>threshold?'bg-emerald-500':score<threshold?'bg-rose-400':'bg-slate-400'}`} style={{width:`${Math.max(0,Math.min(100,score/max*100))}%`}}/></div>
+        </div>;
+      })}
+    </div>
+    <details className="border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+      <summary className="cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-200">Comparar organismos con el promedio de su nivel institucional</summary>
+      <div className="mt-3 space-y-2">
+        {Object.entries(groups).sort(([,left],[,right])=>right.reduce((sum,row)=>sum+row[scoreKey],0)/right.length-left.reduce((sum,row)=>sum+row[scoreKey],0)/left.length).map(([type,groupRows])=>{
+          const levelMean=groupRows.reduce((sum,row)=>sum+row[scoreKey],0)/groupRows.length;
+          const levelThreshold=Math.round(levelMean*10)/10;
+          const groupAbove=groupRows.filter(row=>row[scoreKey]>levelThreshold).length;
+          const groupBelow=groupRows.filter(row=>row[scoreKey]<levelThreshold).length;
+          const groupEqual=groupRows.length-groupAbove-groupBelow;
+          return <details key={type} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
+            <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-2 text-xs">
+              <strong>{type} <span className="font-normal text-slate-500">({groupRows.length})</span></strong>
+              <span className="text-slate-600 dark:text-slate-300">Media {fmt(levelThreshold)} / {max} · {groupAbove} sobre · {groupBelow} debajo{groupEqual?` · ${groupEqual} igual`:''}</span>
+            </summary>
+            <div className="mt-2 divide-y divide-slate-200 dark:divide-slate-800">
+              {[...groupRows].sort((a,b)=>b[scoreKey]-a[scoreKey]).map(row=>{
+                const score=row[scoreKey];
+                const status=score>levelThreshold?'Por encima':score<levelThreshold?'Por debajo':'En el promedio';
+                const statusClass=score>levelThreshold?'text-emerald-800 dark:text-emerald-300':score<levelThreshold?'text-rose-800 dark:text-rose-300':'text-slate-600 dark:text-slate-300';
+                return <div key={row.org.id} className="flex flex-wrap justify-between gap-2 py-2 text-[11px]">
+                  <span>{row.org.nombre}</span><span className="font-mono">{fmt(score)} / {max} · <strong className={statusClass}>{status}</strong></span>
+                </div>;
+              })}
+            </div>
+          </details>;
+        })}
+      </div>
+    </details>
+  </article>;
+}
 
 function Pagination({page,pageCount,total,onChange}:{page:number;pageCount:number;total:number;onChange:(page:number)=>void}){return <div className="flex items-center justify-between gap-3 text-xs text-slate-500"><span>{total?page*RANKING_PAGE_SIZE+1:0}–{Math.min((page+1)*RANKING_PAGE_SIZE,total)} de {total} organismos</span><div className="flex items-center gap-2"><button aria-label="Página anterior" disabled={page===0} onClick={()=>onChange(Math.max(0,page-1))} className="rounded-md border p-1.5 disabled:opacity-40"><ChevronLeft size={16}/></button><span>Página {page+1} de {pageCount}</span><button aria-label="Página siguiente" disabled={page>=pageCount-1} onClick={()=>onChange(Math.min(pageCount-1,page+1))} className="rounded-md border p-1.5 disabled:opacity-40"><ChevronRight size={16}/></button></div></div>}
