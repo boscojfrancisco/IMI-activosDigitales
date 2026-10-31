@@ -4,381 +4,91 @@ import { createServer as createViteServer } from 'vite';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
-import { db } from './src/db/index.ts';
+import { db, client as businessClient, identityClient } from './src/db/index.ts';
 import { organismos, indicadoresHistory, usuarios, digitalObservaciones, digitalCortes, digitalTramites, digitalVisitas, digitalMigrations, digitalVerificaciones } from './src/db/schema.ts';
 import { eq, desc, sql } from 'drizzle-orm';
-import { requireAuth, checkRole, AuthRequest } from './src/middleware/auth.ts';
+import { requireAuth, checkRole, requireGlobalAdmin, AuthRequest } from './src/middleware/auth.ts';
+import { pilotLogin, initializePilot, pilotCreateUser, pilotUpdateProfile, pilotSetAccess, pilotListUsers, pilotChangePassword, pilotIssueRecovery, pilotConsumeRecovery, pilotFindGlobal, pilotGlobalLogin, pilotPersistentLimit, pilotBootstrapStart } from './src/pilot-identity.ts';
 import catalog from './src/data/digital-index-catalog.json' assert { type: 'json' };
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
-app.use(express.json());
+app.disable('x-powered-by');
+if(process.env.IMI_TRUST_PROXY==='loopback')app.set('trust proxy','loopback');
+else if(process.env.IMI_TRUST_PROXY)throw new Error('Configuración de proxy inválida');
+app.use(express.json({limit:'32kb'}));
+app.use('/api',(_req,res,next)=>{res.set('Cache-Control','no-store');next()});
+// Modo de verificación local: permite autenticarse, pero no mutar datos por la API.
+if(process.env.IMI_SOLO_LECTURA!=='no') app.use('/api',(req,res,next)=>{
+ if(['GET','HEAD','OPTIONS'].includes(req.method)||(req.method==='POST'&&['/auth/login','/central/login'].includes(req.path)))return next();
+ return res.status(403).json({error:'Operación no disponible en modo de verificación'});
+});
+// Durante el corte, las contraseñas y permisos permanecen congelados para permitir reversión.
+if(process.env.IMI_CONGELAR_IDENTIDAD==='si') app.use('/api',(req,res,next)=>{
+ const changing=!['GET','HEAD','OPTIONS'].includes(req.method);
+ if(changing&&(/^\/(?:central|pilot)\/users(?:\/|$)/.test(req.path)||['/auth/password','/auth/recovery','/central/password'].includes(req.path)))return res.status(503).json({error:'La administración de usuarios está temporalmente en pausa.'});
+ return next();
+});
+app.get('/api/health',async(_req,res)=>{
+ try{await Promise.all([identityClient.query('SELECT 1 FROM identidad.tableros LIMIT 1'),businessClient.query('SELECT 1 FROM public.organismos LIMIT 1')]);return res.json({servicio:'imi-activos-identidad',estado:'ok'})}
+ catch{return res.status(503).json({servicio:'imi-activos-identidad',estado:'no-disponible'})}
+});
 
-const JWT_SECRET = process.env.JWT_SECRET || 'imi-activos-digitales-secret-key-2026';
+const JWT_SECRET = process.env.PILOTO_JWT_SECRET;
+if(!JWT_SECRET || JWT_SECRET.length < 48) throw new Error('Se requiere un secreto JWT de al menos 48 caracteres');
 
-function hashPassword(password: string): string {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-  return `${salt}:${hash}`;
+// PILOTO AISLADO: autenticación central en base ficticia en memoria.
+// Control experimental persistente en la base efímera, compartido por procesos.
+async function pilotRateLimit(req:express.Request,res:express.Response,next:express.NextFunction) {
+ try {
+  const h=(value:string)=>crypto.createHmac('sha256',JWT_SECRET).update(value).digest('hex');
+  const keys=['ip:'+h(req.ip || 'unknown')];
+  if(typeof req.body?.username==='string'&&req.body.username.length<=100)keys.push('usuario:'+h(req.body.username.trim().toLowerCase()));
+  if(!(await pilotPersistentLimit(keys)))return res.status(429).json({error:'Demasiados intentos'});
+  next();
+ } catch {return res.status(503).json({error:'Identidad no disponible'});}
 }
-
-function verifyPassword(password: string, storedHash: string): boolean {
-  const [salt, hash] = storedHash.split(':');
-  if (!salt || !hash) return false;
-  const verifyHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
-  return hash === verifyHash;
+app.post('/api/auth/login', pilotRateLimit, async (req, res) => {
+  const { username, password } = req.body || {};
+  if (typeof username !== 'string' || username.length>100 || typeof password !== 'string' || password.length>256) return res.status(400).json({error: 'Credenciales requeridas'});
+  try {
+    const user = await pilotLogin(username, password);
+    if (!user) return res.status(401).json({error:'Credenciales o acceso inválidos'});
+    const token = jwt.sign({ idUsuario:user.idUsuario, versionSesion:user.versionSesion }, JWT_SECRET, { expiresIn:'1h', algorithm:'HS256', audience:'activos-piloto' });
+    return res.json({token,user});
+  } catch { return res.status(503).json({error:'Identidad no disponible'}); }
+});
+app.post('/api/auth/password', pilotRateLimit, requireAuth, async (req:AuthRequest,res) => { try { const result=await pilotChangePassword(req.user!.idUsuario,req.body?.actual,req.body?.nueva); return res.status(result.status).json(result); } catch { return res.status(503).json({error:'Identidad no disponible'}); } });
+app.get('/api/auth/me', requireAuth, (req: AuthRequest, res) => res.json(req.user));
+// No permitir que el administrador del tablero modifique cuentas globales por accidente.
+app.use('/api/admin/users', requireAuth, checkRole(['admin']), (_req,res) => res.status(503).json({error:'Administración central aún no implementada en el piloto'}));
+// API de administración experimental; no reemplaza aún el panel existente.
+app.get('/api/pilot/users', requireAuth, checkRole(['admin']), async (_req,res) => { try { res.json(await pilotListUsers()); } catch { res.status(503).json({error:'Identidad no disponible'}); } });
+app.patch('/api/pilot/users/:id/access', requireAuth, checkRole(['admin']), async (req:AuthRequest,res) => { try { const result=await pilotSetAccess(Number(req.params.id),req.user!.idUsuario,req.body); res.status(result.status).json(result); } catch { res.status(503).json({error:'Identidad no disponible'}); } });
+app.post('/api/auth/recovery', pilotRateLimit, async (req,res) => { try { const result=await pilotConsumeRecovery(req.body?.codigo,req.body?.nueva); res.status(result.status).json(result); } catch { res.status(503).json({error:'Identidad no disponible'}); } });
+app.get('/pilot-recovery', (_req,res) => res.sendFile(path.join(process.cwd(),'piloto-recovery.html')));
+// Administración global independiente; solo entorno efímero de prueba.
+async function globalAuth(req:AuthRequest,res:express.Response,next:express.NextFunction) {
+ const token=req.headers.authorization?.match(/^Bearer (.+)$/)?.[1]; if(!token)return res.status(401).json({error:'Falta sesión'});
+ try {const value=jwt.verify(token,JWT_SECRET,{algorithms:['HS256'],audience:'central-piloto'}) as any; if(!Number.isSafeInteger(value.idUsuario)||!Number.isSafeInteger(value.versionSesion)) return res.status(401).json({error:'Sesión inválida'});
+  try{const user=await pilotFindGlobal(value.idUsuario);if(!user||user.versionSesion!==value.versionSesion)return res.status(403).json({error:'Acceso inactivo'});req.user=user;next();}catch{return res.status(503).json({error:'Identidad no disponible'});}
+ }catch{return res.status(401).json({error:'Sesión inválida'});}
 }
+app.post('/api/central/login',pilotRateLimit,async(req,res)=>{try{const {username,password}=req.body||{};if(typeof username!=='string'||username.length>100||typeof password!=='string'||password.length>256)return res.status(400).json({error:'Credenciales requeridas'});const user=await pilotGlobalLogin(username,password);if(!user)return res.status(401).json({error:'Credenciales inválidas'});const token=jwt.sign({idUsuario:user.idUsuario,versionSesion:user.versionSesion},JWT_SECRET,{algorithm:'HS256',audience:'central-piloto',expiresIn:'1h'});return res.json({token,user});}catch{return res.status(503).json({error:'Identidad no disponible'});}});
+// Registro de reemplazo de MFA: sesión central + contraseña y segundo factor vigente.
+app.post('/api/central/password',pilotRateLimit,globalAuth,async(req:AuthRequest,res)=>{try{const x=await pilotChangePassword(req.user!.idUsuario,req.body?.actual,req.body?.nueva);res.status(x.status).json(x)}catch{res.status(503).json({error:'Identidad no disponible'})}});
+app.get('/api/central/users',globalAuth,async(_req,res)=>{try{res.json(await pilotListUsers(true))}catch{res.status(503).json({error:'Identidad no disponible'})}});
+app.post('/api/central/users',globalAuth,async(req:AuthRequest,res)=>{try{const x=await pilotCreateUser(req.body,req.user!.idUsuario);res.status(x.status).json(x)}catch{res.status(503).json({error:'Identidad no disponible'})}});
+app.patch('/api/central/users/:id/profile',globalAuth,async(req:AuthRequest,res)=>{try{const x=await pilotUpdateProfile(Number(req.params.id),req.user!.idUsuario,req.body);res.status(x.status).json(x)}catch{res.status(503).json({error:'Identidad no disponible'})}});
+app.patch('/api/central/users/:id/access',globalAuth,async(req:AuthRequest,res)=>{try{const x=await pilotSetAccess(Number(req.params.id),req.user!.idUsuario,req.body);res.status(x.status).json(x)}catch{res.status(503).json({error:'Identidad no disponible'})}});
+app.post('/api/central/users/:id/recovery',pilotRateLimit,globalAuth,async(req:AuthRequest,res)=>{try{res.set('Cache-Control','no-store');const x=await pilotIssueRecovery(Number(req.params.id),req.user!.idUsuario);res.status(x.status).json(x)}catch{res.status(503).json({error:'Identidad no disponible'})}});
+if(process.env.IMI_PRUEBA_LOCAL==='si'&&process.env.IMI_PERMITIR_ALTA_INICIAL==='si')app.get('/pilot-alta',(_req,res)=>res.sendFile(path.join(process.cwd(),'piloto-alta.html')));
+app.get('/pilot-central',(_req,res)=>res.sendFile(path.join(process.cwd(),'piloto-central.html')));
+app.get('/pilot-password', (_req,res) => res.sendFile(path.join(process.cwd(),'piloto-password.html')));
+// El alta inicial solo se habilita explícitamente en bases locales descartables.
+if(process.env.IMI_PRUEBA_LOCAL==='si'&&process.env.IMI_PERMITIR_ALTA_INICIAL==='si')app.post('/api/bootstrap/start',pilotRateLimit,async(req,res)=>{try{const result=await pilotBootstrapStart(req.body);res.set('Cache-Control','no-store');if(!result)return res.status(400).json({error:'No se pudo preparar el alta'});res.json(result)}catch{return res.status(503).json({error:'Identidad no disponible'})}});
 
-async function seedDatabaseIfEmpty() {
-  try {
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS digital_observaciones (
-      id SERIAL PRIMARY KEY,
-      organismo_id INTEGER NOT NULL REFERENCES organismos(id) ON DELETE CASCADE,
-      variable_id VARCHAR(2) NOT NULL,
-      nivel INTEGER NOT NULL CHECK (nivel BETWEEN 0 AND 3),
-      fuente VARCHAR(1) NOT NULL CHECK (fuente IN ('W','S','V')),
-      fecha_observacion VARCHAR(10) NOT NULL,
-      evidencia TEXT,
-      notas TEXT,
-      usuario TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS digital_cortes (
-      id SERIAL PRIMARY KEY,
-      fecha VARCHAR(10) NOT NULL,
-      nombre VARCHAR(40) NOT NULL UNIQUE,
-      snapshot JSONB NOT NULL,
-      cerrado_por TEXT NOT NULL,
-      cerrado_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS digital_detalle_tramites (
-      id SERIAL PRIMARY KEY, organismo_id INTEGER NOT NULL REFERENCES organismos(id) ON DELETE CASCADE,
-      fecha VARCHAR(10) NOT NULL, nativos INTEGER NOT NULL DEFAULT 0, integrados INTEGER NOT NULL DEFAULT 0,
-      fuera_mi_corrientes INTEGER NOT NULL DEFAULT 0, usuario TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await db.execute(sql`ALTER TABLE digital_detalle_tramites ADD COLUMN IF NOT EXISTS integrados_links JSONB NOT NULL DEFAULT '[]'::jsonb`);
-    await db.execute(sql`ALTER TABLE digital_detalle_tramites ADD COLUMN IF NOT EXISTS fuera_mi_corrientes_links JSONB NOT NULL DEFAULT '[]'::jsonb`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS digital_visitas (
-      id SERIAL PRIMARY KEY, organismo_id INTEGER NOT NULL REFERENCES organismos(id) ON DELETE CASCADE,
-      fecha VARCHAR(10) NOT NULL, observaciones TEXT, usuario TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS digital_migrations (
-      code VARCHAR(80) PRIMARY KEY, usuario TEXT NOT NULL, resumen JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS digital_verificaciones (
-      organismo_id INTEGER PRIMARY KEY REFERENCES organismos(id) ON DELETE CASCADE,
-      variables JSONB NOT NULL DEFAULT '{}'::jsonb, cerrado_por TEXT, cerrado_at TIMESTAMPTZ
-    )`);
-    const existing = await db.select().from(organismos);
-    
-    // Si ya hay organismos, verificar si el historial está vacío para sembrar la línea base
-    if (existing.length > 0) {
-      console.log(`Database already has ${existing.length} organismos. Checking history baseline...`);
-      const existingHistory = await db.select().from(indicadoresHistory);
-      if (existingHistory.length === 0) {
-        console.log("No history found. Creating initial baseline history for existing records...");
-        for (const org of existing) {
-          await db.insert(indicadoresHistory).values({
-            organismoId: org.id,
-            userId: 'Línea Base Inicial',
-            snapshot: JSON.stringify(org)
-          });
-        }
-        console.log("Initial baseline history generated successfully.");
-      }
-      return;
-    }
-
-    console.log("Database is empty. Seeding from Google Sheets...");
-    const DATA_URL = "https://docs.google.com/spreadsheets/d/1nbgHe7U_A6l25EJTgJz6ERtnE8XmyVV3/gviz/tq?tqx=out:json&gid=67432853";
-    const response = await fetch(DATA_URL);
-    if (!response.ok) {
-      throw new Error(`HTTP error fetching spreadsheet: ${response.status}`);
-    }
-    const text = await response.text();
-    
-    // Extract the JSON payload within google.visualization.Query.setResponse()
-    const match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\);/);
-    if (!match) {
-      throw new Error("Invalid response format from Google Sheets");
-    }
-    
-    const parsed = JSON.parse(match[1]);
-    const table = parsed.table;
-    
-    const validRows = table.rows.filter((r: any) => {
-      if (!r || !Array.isArray(r.c)) return false;
-      const orgCell = r.c[0];
-      return orgCell && orgCell.v && orgCell.v.toString().trim() !== '';
-    });
-
-    const parsedData = validRows.map((r: any) => {
-      const c = r.c || [];
-      const getVal = (idx: number, preferFormatted = false) => {
-        const cell = c[idx];
-        if (!cell) return '';
-        if (preferFormatted && cell.f) return cell.f.toString();
-        return (cell.v !== null && cell.v !== undefined) ? cell.v.toString() : '';
-      };
-
-      const nombre = getVal(0).trim();
-      const tipo = getVal(1).trim() || 'Desconocido';
-      const tieneWebStr = getVal(2).trim().toLowerCase();
-      
-      const websitePropia = getVal(4).trim();
-      const websiteGov = getVal(3).trim();
-      let enlaceWeb = '';
-      if (websitePropia && websitePropia !== 'null' && websitePropia !== '') {
-        enlaceWeb = websitePropia;
-      } else if (websiteGov && websiteGov !== 'null' && websiteGov !== '') {
-        enlaceWeb = websiteGov;
-      }
-
-      const tieneWebPropia = websitePropia && websitePropia !== 'null' && websitePropia.trim() !== '';
-      const enlaceWebPropia = tieneWebPropia ? websitePropia : '';
-      const enlaceWebGov = websiteGov && websiteGov !== 'null' ? websiteGov : '';
-
-      const guiaTramites = getVal(7).trim();
-      const enlaceGuia = getVal(8).trim();
-
-      const qTramitesRaw = getVal(9).trim();
-      const qTramitesVal = parseInt(qTramitesRaw.replace(/\D/g, ''), 10);
-
-      const tramitesOnline = getVal(10).trim();
-      let enlaceTramitesOnline = getVal(11).trim();
-      if (!enlaceTramitesOnline || enlaceTramitesOnline === 'null') {
-        enlaceTramitesOnline = getVal(14).trim();
-      }
-
-      const expedienteDigital = getVal(16).trim();
-      const turnosOnline = getVal(17).trim();
-      const atencionDigital = getVal(18).trim();
-      const seguimientoTramites = getVal(19).trim();
-
-      const usaIAStr = getVal(22).trim().toLowerCase();
-      const chatbotStr = getVal(23).trim().toLowerCase();
-
-      return {
-        nombre,
-        tipo,
-        tieneWeb: tieneWebStr === 'si' || tieneWebStr === 'sí',
-        enlaceWeb,
-        enlaceWebGov,
-        tieneWebPropia,
-        enlaceWebPropia,
-        guiaTramites: guiaTramites || 'No',
-        enlaceGuia: enlaceGuia && enlaceGuia !== 'null' ? enlaceGuia : '',
-        qTramitesGuia: isNaN(qTramitesVal) ? 0 : qTramitesVal,
-        tramitesOnline: tramitesOnline || 'No',
-        enlaceTramitesOnline: enlaceTramitesOnline && enlaceTramitesOnline !== 'null' ? enlaceTramitesOnline : '',
-        expedienteDigital: expedienteDigital || 'No',
-        firmaDigital: 'No',
-        analisisProcesos: 'No',
-        tieneDoco: 'No',
-        usaSiif: 'No',
-        usaIA: usaIAStr === 'si' || usaIAStr === 'sí',
-        chatbot: chatbotStr === 'si' || chatbotStr === 'sí',
-        turnosOnline: turnosOnline || 'No',
-        seguimientoTramites: seguimientoTramites || 'No',
-        atencionDigital: atencionDigital || 'No',
-      };
-    });
-
-    await db.insert(organismos).values(parsedData);
-    
-    // Sembrar también el historial inicial
-    const inserted = await db.select().from(organismos);
-    for (const org of inserted) {
-      await db.insert(indicadoresHistory).values({
-        organismoId: org.id,
-        userId: 'Línea Base Inicial',
-        snapshot: JSON.stringify(org)
-      });
-    }
-    console.log("Database and baseline history seeded successfully!");
-  } catch (err: any) {
-    console.error("Failed to seed database on startup:", err);
-  }
-}
-
-// --- RUTAS DE AUTENTICACIÓN Y ROLES DE USUARIO ---
-
-// El alta de cuentas se gestiona exclusivamente desde el panel de administración.
-app.post('/api/auth/register', (_req, res) => {
-  return res.status(410).json({ error: 'El registro público está deshabilitado. Solicita una cuenta a un administrador.' });
-});
-
-// Login de usuarios
-app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
-  }
-
-  try {
-    const userRecords = await db.select()
-      .from(usuarios)
-      .where(eq(usuarios.username, username))
-      .limit(1);
-
-    if (userRecords.length === 0) {
-      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
-    }
-
-    const user = userRecords[0];
-
-    if (!user.activo) {
-      return res.status(403).json({ error: 'La cuenta del usuario está desactivada' });
-    }
-
-    const isValid = verifyPassword(password, user.passwordHash);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
-    }
-
-    // Generar Token JWT
-    const token = jwt.sign(
-      { idUsuario: user.idUsuario, username: user.username, tableroAcceso: user.tableroAcceso },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    return res.json({
-      token,
-      user: {
-        idUsuario: user.idUsuario,
-        username: user.username,
-        tableroAcceso: user.tableroAcceso
-      }
-    });
-  } catch (err: any) {
-    console.error('Error al iniciar sesión:', err);
-    return res.status(500).json({ error: err.message || 'Error interno del servidor' });
-  }
-});
-
-// Obtener datos del usuario actual autenticado
-app.get('/api/auth/me', requireAuth, (req: AuthRequest, res) => {
-  return res.json(req.user);
-});
-
-// Listar todos los usuarios (solo Admin)
-app.get('/api/admin/users', requireAuth, checkRole(['admin']), async (req, res) => {
-  try {
-    const list = await db.select({
-      idUsuario: usuarios.idUsuario,
-      username: usuarios.username,
-      tableroAcceso: usuarios.tableroAcceso,
-      activo: usuarios.activo,
-      fechaCreacion: usuarios.fechaCreacion
-    }).from(usuarios);
-    
-    return res.json(list);
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// Modificar rol de un usuario (solo Admin)
-app.put('/api/admin/users/:id/role', requireAuth, checkRole(['admin']), async (req, res) => {
-  const { id } = req.params;
-  const { tableroAcceso } = req.body;
-
-  if (!['admin', 'editor', 'reader'].includes(tableroAcceso)) {
-    return res.status(400).json({ error: 'Rol inválido' });
-  }
-
-  try {
-    await db.update(usuarios)
-      .set({ tableroAcceso })
-      .where(eq(usuarios.idUsuario, Number(id)));
-
-    return res.json({ success: true, message: 'Rol de usuario actualizado' });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// Alternar estado de un usuario (solo Admin)
-app.put('/api/admin/users/:id/status', requireAuth, checkRole(['admin']), async (req, res) => {
-  const { id } = req.params;
-  const { activo } = req.body;
-
-  if (typeof activo !== 'boolean') {
-    return res.status(400).json({ error: 'El estado activo debe ser booleano' });
-  }
-
-  try {
-    await db.update(usuarios)
-      .set({ activo })
-      .where(eq(usuarios.idUsuario, Number(id)));
-
-    return res.json({ success: true, message: 'Estado del usuario actualizado' });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// Crear usuario desde panel de administración (solo Admin)
-app.post('/api/admin/users', requireAuth, checkRole(['admin']), async (req, res) => {
-  const { username, password, role } = req.body;
-
-  if (!username || !password || !role) {
-    return res.status(400).json({ error: 'Todos los campos son requeridos' });
-  }
-
-  if (!['admin', 'editor', 'reader'].includes(role)) {
-    return res.status(400).json({ error: 'Rol inválido' });
-  }
-
-  try {
-    const existing = await db.select()
-      .from(usuarios)
-      .where(eq(usuarios.username, username))
-      .limit(1);
-
-    if (existing.length > 0) {
-      return res.status(400).json({ error: 'El nombre de usuario ya existe' });
-    }
-
-    const passwordHash = hashPassword(password);
-
-    await db.insert(usuarios).values({
-      username,
-      passwordHash,
-      tableroAcceso: role,
-      activo: true
-    });
-
-    return res.json({ success: true, message: 'Usuario creado exitosamente' });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// Eliminar usuario (solo Admin)
-app.delete('/api/admin/users/:id', requireAuth, checkRole(['admin']), async (req: AuthRequest, res) => {
-  const { id } = req.params;
-  const targetId = Number(id);
-
-  // Impedir auto-eliminación
-  if (req.user && req.user.idUsuario === targetId) {
-    return res.status(400).json({ error: 'No podés eliminar tu propia cuenta' });
-  }
-
-  try {
-    await db.delete(usuarios)
-      .where(eq(usuarios.idUsuario, targetId));
-
-    return res.json({ success: true, message: 'Usuario eliminado exitosamente' });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
-// API route to get data from Database.
 app.get('/api/organismos', async (req, res) => {
   try {
     const existing = await db.select().from(organismos);
@@ -389,8 +99,8 @@ app.get('/api/organismos', async (req, res) => {
     }));
     return res.json(formatted);
   } catch (err: any) {
-    console.error("Backend failed:", err);
-    res.status(500).json({ error: err.message || "Failed to load database" });
+    console.error("Falló la consulta de organismos.");
+    res.status(500).json({ error: 'No se pudieron cargar los organismos.' });
   }
 });
 
@@ -507,7 +217,7 @@ app.get('/api/digital-index/legacy-baseline', requireAuth, checkRole(['admin', '
     const eligible = legacyBaselineCandidates(allOrgs).filter(candidate => !allObservations.some(row => row.organismoId === candidate.organismoId && row.variableId === candidate.variableId));
     const byVariable = Object.fromEntries(catalog.map((variable:any) => [variable.id, eligible.filter(row => row.variableId === variable.id).length]));
     res.json({ applied: priorMigrations.some(item => item.code === LEGACY_BASELINE_CODE), candidates: eligible.length, byVariable });
-  } catch (error: any) { res.status(500).json({ error: error.message || 'No se pudo revisar la línea de base.' }); }
+  } catch (error: any) { res.status(500).json({ error: 'No se pudo revisar la línea de base.' }); }
 });
 
 app.post('/api/digital-index/legacy-baseline', requireAuth, checkRole(['admin', 'editor']), async (req: AuthRequest, res) => {
@@ -524,7 +234,7 @@ app.post('/api/digital-index/legacy-baseline', requireAuth, checkRole(['admin', 
     });
     res.status(201).json(result);
   } catch (error: any) {
-    res.status(error.message?.includes('ya fue migrada') ? 409 : 500).json({ error: error.message || 'No se pudo migrar la línea de base.' });
+    res.status(error.message?.includes('ya fue migrada') ? 409 : 500).json({ error: 'No se pudo migrar la línea de base.' });
   }
 });
 
@@ -536,7 +246,7 @@ app.get('/api/digital-index/legacy-complete', requireAuth, checkRole(['admin', '
     const plan = await legacyCompletePlan(allOrgs, allObservations);
     const summary = Object.fromEntries(catalog.map((variable:any) => [variable.id, plan.insert.filter(row=>row.variableId===variable.id).length + plan.update.filter(item=>item.value.variableId===variable.id).length]));
     res.json({ applied:prior.length>0, candidates:plan.insert.length+plan.update.length, byVariable:summary });
-  } catch (error:any) { res.status(500).json({error:error.message || 'No se pudo revisar la migración integral.'}); }
+  } catch (error:any) { res.status(500).json({error:'No se pudo revisar la migración integral.'}); }
 });
 
 app.post('/api/digital-index/legacy-complete', requireAuth, checkRole(['admin', 'editor']), async (req:AuthRequest, res) => {
@@ -553,7 +263,7 @@ app.post('/api/digital-index/legacy-complete', requireAuth, checkRole(['admin', 
       return {inserted:plan.insert.length,updated:plan.update.length,byVariable};
     });
     res.status(201).json(result);
-  } catch (error:any) { res.status(error.message?.includes('ya fue aplicada')?409:500).json({error:error.message || 'No se pudo completar la migración.'}); }
+  } catch (error:any) { res.status(error.message?.includes('ya fue aplicada')?409:500).json({error:'No se pudo completar la migración.'}); }
 });
 
 app.get('/api/digital-index/observations', async (_req, res) => {
@@ -561,7 +271,7 @@ app.get('/api/digital-index/observations', async (_req, res) => {
     const rows = await db.select().from(digitalObservaciones).orderBy(desc(digitalObservaciones.fechaObservacion), desc(digitalObservaciones.id));
     res.json(rows);
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'No se pudieron cargar las observaciones.' });
+    res.status(500).json({ error: 'No se pudieron cargar las observaciones.' });
   }
 });
 
@@ -571,7 +281,7 @@ app.get('/api/digital-index/verifications', requireAuth, checkRole(['admin', 'ed
     const organizations = await db.select({ id: organismos.id }).from(organismos);
     const complete = organizations.length > 0 && rows.filter(row => row.cerradoAt).length === organizations.length;
     res.json({ rows, total: organizations.length, closed: rows.filter(row => row.cerradoAt).length, cleanupReady: complete });
-  } catch (error:any) { res.status(500).json({error:error.message || 'No se pudieron cargar las verificaciones.'}); }
+  } catch (error:any) { res.status(500).json({error:'No se pudieron cargar las verificaciones.'}); }
 });
 
 app.post('/api/digital-index/organismos/:id/verification', requireAuth, checkRole(['admin', 'editor']), async (req: AuthRequest, res) => {
@@ -604,7 +314,7 @@ app.post('/api/digital-index/organismos/:id/verification', requireAuth, checkRol
     });
     if ('error' in txResult) return res.status(400).json({error:txResult.error});
     res.json(txResult);
-  } catch (error:any) { res.status(500).json({error:error.message || 'No se pudo guardar la verificación.'}); }
+  } catch (error:any) { res.status(500).json({error:'No se pudo guardar la verificación.'}); }
 });
 
 app.post('/api/digital-index/organismos/:id/verification/close', requireAuth, checkRole(['admin', 'editor']), async (req: AuthRequest, res) => {
@@ -615,7 +325,7 @@ app.post('/api/digital-index/organismos/:id/verification/close', requireAuth, ch
     if (!allReviewed) return res.status(409).json({error:'Completá la verificación de las 11 variables antes de cerrar.'});
     const [closed] = await db.insert(digitalVerificaciones).values({organismoId,variables:record!.variables,cerradoPor:req.user?.username || 'Usuario',cerradoAt:new Date()}).onConflictDoUpdate({target:digitalVerificaciones.organismoId,set:{cerradoPor:req.user?.username || 'Usuario',cerradoAt:new Date()}}).returning();
     res.json(closed);
-  } catch (error:any) { res.status(500).json({error:error.message || 'No se pudo cerrar la verificación.'}); }
+  } catch (error:any) { res.status(500).json({error:'No se pudo cerrar la verificación.'}); }
 });
 
 app.delete('/api/digital-index/provisional-observations', requireAuth, checkRole(['admin']), async (_req, res) => {
@@ -625,7 +335,7 @@ app.delete('/api/digital-index/provisional-observations', requireAuth, checkRole
     if (!ready) return res.status(409).json({error:'La limpieza requiere cerrar la verificación de todos los organismos y sus 11 variables.'});
     const deleted = await db.delete(digitalObservaciones).where(sql`${digitalObservaciones.notas} LIKE '%[base monitor anterior]%'`).returning({id:digitalObservaciones.id});
     res.json({deleted:deleted.length});
-  } catch (error:any) { res.status(500).json({error:error.message || 'No se pudieron retirar los registros provisorios.'}); }
+  } catch (error:any) { res.status(500).json({error:'No se pudieron retirar los registros provisorios.'}); }
 });
 
 app.post('/api/digital-index/observations', requireAuth, checkRole(['admin', 'editor']), async (req: AuthRequest, res) => {
@@ -659,7 +369,7 @@ app.post('/api/digital-index/observations', requireAuth, checkRole(['admin', 'ed
     });
     res.status(201).json(row);
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'No se pudo guardar la observación.' });
+    res.status(500).json({ error: 'No se pudo guardar la observación.' });
   }
 });
 
@@ -697,7 +407,7 @@ app.post('/api/digital-index/observations/import', requireAuth, checkRole(['admi
     });
     res.status(201).json({ inserted: validValues.length });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'No se pudo importar el archivo.' });
+    res.status(500).json({ error: 'No se pudo importar el archivo.' });
   }
 });
 
@@ -706,7 +416,7 @@ app.get('/api/digital-index/cuts', async (_req, res) => {
     const rows = await db.select().from(digitalCortes).orderBy(desc(digitalCortes.fecha), desc(digitalCortes.id));
     res.json(rows);
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'No se pudieron cargar los cortes.' });
+    res.status(500).json({ error: 'No se pudieron cargar los cortes.' });
   }
 });
 
@@ -719,7 +429,7 @@ app.get('/api/digital-index/organismos/:id/extra', async (req, res) => {
     ]);
     res.json({ tramites, visitas });
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'No se pudieron cargar los datos complementarios.' });
+    res.status(500).json({ error: 'No se pudieron cargar los datos complementarios.' });
   }
 });
 
@@ -736,7 +446,7 @@ app.post('/api/digital-index/organismos/:id/tramites', requireAuth, checkRole(['
   try {
     const [row] = await db.insert(digitalTramites).values({ organismoId, fecha, nativos: counts[0], integrados: counts[1], fueraMiCorrientes: counts[2], integradosLinks, fueraMiCorrientesLinks, usuario: req.user?.username || 'Usuario' }).returning();
     res.status(201).json(row);
-  } catch (error: any) { res.status(500).json({ error: error.message || 'No se pudo guardar el detalle de trámites.' }); }
+  } catch (error: any) { res.status(500).json({ error: 'No se pudo guardar el detalle de trámites.' }); }
 });
 
 app.post('/api/digital-index/organismos/:id/visitas', requireAuth, checkRole(['admin', 'editor']), async (req: AuthRequest, res) => {
@@ -745,7 +455,7 @@ app.post('/api/digital-index/organismos/:id/visitas', requireAuth, checkRole(['a
   try {
     const [row] = await db.insert(digitalVisitas).values({ organismoId, fecha, observaciones: observaciones || null, usuario: req.user?.username || 'Usuario' }).returning();
     res.status(201).json(row);
-  } catch (error: any) { res.status(500).json({ error: error.message || 'No se pudo guardar la visita.' }); }
+  } catch (error: any) { res.status(500).json({ error: 'No se pudo guardar la visita.' }); }
 });
 
 app.post('/api/digital-index/cuts', requireAuth, checkRole(['admin', 'editor']), async (req: AuthRequest, res) => {
@@ -781,7 +491,7 @@ app.post('/api/digital-index/cuts', requireAuth, checkRole(['admin', 'editor']),
     const [cut] = await db.insert(digitalCortes).values({ fecha, nombre: nombre.trim(), snapshot, cerradoPor: req.user?.username || 'Usuario' }).returning();
     res.status(201).json(cut);
   } catch (error: any) {
-    res.status(500).json({ error: error.message || 'No se pudo cerrar el corte.' });
+    res.status(500).json({ error: 'No se pudo cerrar el corte.' });
   }
 });
 
@@ -837,7 +547,7 @@ app.put('/api/organismos/:id', requireAuth, checkRole(['admin', 'editor']), asyn
       });
       console.log("History log saved for organism:", id);
     } catch (e) {
-      console.error("Failed to write to history log:", e);
+      console.error("Falló el registro de historial.");
     }
 
     const formatted = {
@@ -846,8 +556,8 @@ app.put('/api/organismos/:id', requireAuth, checkRole(['admin', 'editor']), asyn
     };
     res.json(formatted);
   } catch (error: any) {
-    console.error("Update failed:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Falló la actualización.");
+    res.status(500).json({ error: 'No se pudo completar la operación.' });
   }
 });
 
@@ -868,7 +578,7 @@ app.get('/api/organismos/:id/history', requireAuth, checkRole(['admin', 'editor'
 
     res.json(history);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'No se pudo completar la operación.' });
   }
 });
 
@@ -898,7 +608,7 @@ app.get('/api/history', requireAuth, checkRole(['admin', 'editor']), async (req,
 
     res.json(enriched);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'No se pudo completar la operación.' });
   }
 });
 
@@ -906,7 +616,7 @@ app.get('/api/history', requireAuth, checkRole(['admin', 'editor']), async (req,
 // Configure Vite middleware in development or serve static build files in production
 async function startServer() {
   // Ensure database is seeded on start
-  await seedDatabaseIfEmpty();
+  await initializePilot();
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -922,7 +632,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const bindHost=process.env.IMI_BIND_HOST||'127.0.0.1';
+  if(!['127.0.0.1','0.0.0.0'].includes(bindHost))throw new Error('Dirección de escucha inválida');
+  app.listen(PORT, bindHost, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }

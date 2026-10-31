@@ -11,7 +11,7 @@ import OrganismoEditModal from './components/OrganismoEditModal';
 import GeneralHistory from './components/GeneralHistory';
 import ComparatorModal from './components/ComparatorModal';
 import LoginModal from './components/LoginModal';
-import UserManagement from './components/UserManagement';
+import UserManagement from './components/UserManagementCentral';
 import DigitalIndex from './components/DigitalIndex';
 import { AnimatePresence, motion } from 'motion/react';
 import { 
