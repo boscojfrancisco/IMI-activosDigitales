@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
 import { db, client as businessClient, identityClient } from './src/db/index.ts';
-import { organismos, indicadoresHistory, usuarios, digitalObservaciones, digitalCortes, digitalTramites, digitalVisitas, digitalMigrations, digitalVerificaciones } from './src/db/schema.ts';
+import { organismos, indicadoresHistory, digitalObservaciones, digitalCortes, digitalTramites, digitalVisitas, digitalMigrations, digitalVerificaciones } from './src/db/schema.ts';
 import { eq, desc, sql } from 'drizzle-orm';
 import { requireAuth, checkRole, requireGlobalAdmin, AuthRequest } from './src/middleware/auth.ts';
 import { pilotLogin, initializePilot, pilotCreateUser, pilotUpdateProfile, pilotSetAccess, pilotListUsers, pilotChangePassword, pilotIssueRecovery, pilotConsumeRecovery, pilotFindGlobal, pilotGlobalLogin, pilotPersistentLimit, pilotBootstrapStart } from './src/pilot-identity.ts';
