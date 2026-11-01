@@ -36,7 +36,12 @@ if [[ ! -f "$app_dir/ops/identidad/README.md" ]] &&
   echo "First identity deployment requires the guarded cut procedure" >&2
   exit 1
 fi
-backup_dir=''
+backup_dir=$(/usr/bin/mktemp -d /tmp/imi-activos-backup.XXXXXXXX)
+if ! /usr/bin/cp -a -- "$app_dir/dist" "$backup_dir/dist" ||
+   ! /usr/bin/cp -a -- "$app_dir/node_modules" "$backup_dir/node_modules"; then
+  echo "Could not prepare the previous application backup: $backup_dir" >&2
+  exit 1
+fi
 reload_attempted=0
 
 rollback() {
@@ -55,8 +60,8 @@ rollback() {
       echo "Rollback failed: could not restore the previous revision" >&2
       rollback_failed=1
     fi
-    if ! /home/ubuntu/.nvm/versions/node/v20.20.0/bin/npm --prefix "$app_dir" ci --no-audit --no-fund; then
-      echo "Rollback failed: could not restore the previous dependencies" >&2
+    if ! /usr/bin/rm -rf -- "$app_dir/node_modules" || ! /usr/bin/cp -a -- "$backup_dir/node_modules" "$app_dir/node_modules"; then
+      echo "Rollback failed: could not restore the previous dependencies from backup" >&2
       rollback_failed=1
     fi
     if [[ $reload_attempted -eq 1 ]]; then
@@ -81,8 +86,6 @@ trap 'exit 130' INT
 /usr/bin/git reset --hard "$revision" >/dev/null
 /home/ubuntu/.nvm/versions/node/v20.20.0/bin/npm ci --no-audit --no-fund
 
-backup_dir=$(/usr/bin/mktemp -d /tmp/imi-activos-backup.XXXXXXXX)
-/usr/bin/cp -a -- "$app_dir/dist" "$backup_dir/dist"
 /home/ubuntu/.nvm/versions/node/v20.20.0/bin/npm --prefix "$app_dir" run build
 
 reload_attempted=1
