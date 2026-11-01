@@ -30,6 +30,12 @@ if [[ "$revision" != "$main_revision" ]]; then
 fi
 
 previous_revision=$(/usr/bin/git rev-parse HEAD)
+if [[ ! -f "$app_dir/ops/identidad/README.md" ]] &&
+   /usr/bin/git cat-file -e "$revision:ops/identidad/README.md" 2>/dev/null &&
+   [[ "${IMI_GUARDED_CUT:-}" != si ]]; then
+  echo "First identity deployment requires the guarded cut procedure" >&2
+  exit 1
+fi
 backup_dir=''
 reload_attempted=0
 
@@ -68,6 +74,8 @@ rollback() {
   exit "$result"
 }
 trap rollback EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 /usr/bin/git checkout --quiet main
 /usr/bin/git reset --hard "$revision" >/dev/null
@@ -94,6 +102,18 @@ done
 if [[ $healthy -ne 1 ]]; then
   echo "Deployment health check failed" >&2
   exit 1
+fi
+
+if [[ "${IMI_GUARDED_CUT:-}" == si ]]; then
+  # File descriptors 3 and 4 are private pipes from the cut supervisor.
+  # Until the supervisor confirms the lock and verification, EXIT restores
+  # the previous build if the supervisor disappears or the pipe times out.
+  printf 'READY\n' >&3
+  decision=''
+  if ! IFS= read -r -t 60 decision <&4 || [[ "$decision" != COMMIT ]]; then
+    echo "Guarded cut was not confirmed; rolling back" >&2
+    exit 1
+  fi
 fi
 
 echo "Deployed $revision; local health check passed"
