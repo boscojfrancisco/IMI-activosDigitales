@@ -15,7 +15,8 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(express.json());
 
-const JWT_SECRET = process.env.JWT_SECRET || 'imi-activos-digitales-secret-key-2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) throw new Error('JWT_SECRET debe configurarse con al menos 32 caracteres');
 
 function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');
