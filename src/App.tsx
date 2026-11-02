@@ -64,7 +64,7 @@ export default function App() {
   
   // Auth state
   const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<{ idUsuario: number; username: string; tableroAcceso: string } | null>(null);
+  const [user, setUser] = useState<{ idUsuario: number | null; username: string; tableroAcceso: string; origen?: 'central' | 'local' } | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [sortBy, setSortBy] = useState<string>('nombre_asc');
@@ -94,28 +94,21 @@ export default function App() {
     }
   }, [isDark]);
 
-  // Verificar sesión JWT activa al cargar
+  // Priorizar el acceso del portal y mantener disponible la sesión histórica.
   useEffect(() => {
     const savedToken = localStorage.getItem('imi_auth_token');
-    if (savedToken) {
-      fetch(apiUrl('/api/auth/me'), {
-        headers: { 'Authorization': `Bearer ${savedToken}` }
-      })
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error('Sesión vencida');
-      })
-      .then(userData => {
-        setToken(savedToken);
-        setUser(userData);
-      })
-      .catch(() => {
-        localStorage.removeItem('imi_auth_token');
-        localStorage.removeItem('imi_auth_user');
-        setToken(null);
-        setUser(null);
-      });
-    }
+    fetch(apiUrl('/api/auth/me'), {
+      headers: savedToken ? { 'Authorization': `Bearer ${savedToken}` } : {}
+    }).then(res => {
+      if (!res.ok) throw new Error('Sin sesión');
+      return res.json();
+    }).then(userData => {
+      setToken(userData.origen === 'central' ? 'sso' : savedToken);
+      setUser(userData);
+    }).catch(() => {
+      setToken(null);
+      setUser(null);
+    });
   }, []);
 
   // Live timer tick
@@ -470,7 +463,11 @@ export default function App() {
                   </span>
                 </div>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    if (user.origen === 'central') {
+                      const result = await fetch('/sso/logout', { method: 'POST' });
+                      if (!result.ok) return;
+                    }
                     localStorage.removeItem('imi_auth_token');
                     localStorage.removeItem('imi_auth_user');
                     setToken(null);
@@ -638,7 +635,7 @@ export default function App() {
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
                       >
-                        <UserManagement token={token || ''} currentUserId={user?.idUsuario} />
+                        <UserManagement token={token || ''} currentUserId={user?.idUsuario ?? undefined} />
                       </motion.div>
                     )}
                   </AnimatePresence>
