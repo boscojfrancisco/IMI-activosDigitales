@@ -99,7 +99,8 @@ export default function App() {
   useEffect(() => {
     const savedToken = localStorage.getItem('imi_auth_token');
     fetch(apiUrl('/api/auth/me'), {
-      headers: savedToken ? { 'Authorization': `Bearer ${savedToken}` } : {}
+      headers: savedToken ? { 'Authorization': `Bearer ${savedToken}` } : {},
+      signal: AbortSignal.timeout(5000)
     }).then(res => {
       if (!res.ok) throw new Error('Sin sesión');
       return res.json();
