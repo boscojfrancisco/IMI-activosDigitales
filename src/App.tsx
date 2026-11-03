@@ -64,6 +64,7 @@ export default function App() {
   
   // Auth state
   const [token, setToken] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [user, setUser] = useState<{ idUsuario: number | null; username: string; tableroAcceso: string; origen?: 'central' | 'local' } | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
@@ -108,7 +109,7 @@ export default function App() {
     }).catch(() => {
       setToken(null);
       setUser(null);
-    });
+    }).finally(() => setCheckingSession(false));
   }, []);
 
   // Live timer tick
@@ -453,7 +454,9 @@ export default function App() {
             </button>
 
             {/* Auth Section */}
-            {user ? (
+            {checkingSession ? (
+              <span role="status" className="text-xs font-semibold text-slate-500">Comprobando sesión…</span>
+            ) : user ? (
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/30 rounded-xl text-xs shadow-sm">
                   <User className="h-3.5 w-3.5 text-blue-500 shrink-0" />
