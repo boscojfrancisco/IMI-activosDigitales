@@ -4,6 +4,8 @@
 
 El primer corte supervisado quedó confirmado con el commit `4db9cc0`. Se conservó el formulario y la URL de ingreso de Activos; la validación de usuario y contraseña ahora consulta `imi_identidad`. Los ocho accesos centrales coinciden con el origen: dos administradores y seis editores. La equivalencia histórica `admin_mzalazar` → `mzalazar` dejó de aceptarse como nombre de ingreso en el commit `18155b4`, confirmado en producción el 9 de noviembre de 2026. No hay una identidad central separada llamada `admin_mzalazar`; la cuenta antigua en la base de origen quedó inactiva y la equivalencia se conserva para conciliación y reversión.
 
+El titular confirmó el ingreso correcto de las ocho cuentas en producción el 9 de noviembre de 2026.
+
 La tabla `public.usuarios_imi` de `imi_activos_digitales` se conserva para contingencia; la fila antigua `admin_mzalazar` quedó inactiva el 9 de noviembre de 2026. No se borró la tabla ni se consolidaron las bases de negocio. La migración de este corte solo cambia la fuente de autenticación del tablero.
 
 La app quedó con `IMI_SOLO_LECTURA=no` para habilitar operaciones del tablero y `IMI_CONGELAR_IDENTIDAD=si` para pausar altas, cambios de contraseña y permisos desde esta integración durante la observación. La congelación no impide cambios hechos desde otros servicios o herramientas; coordinarlos mientras se define la reversión de credenciales.
@@ -28,6 +30,6 @@ El corte validó bajo bloqueo las ocho huellas, las correspondencias, los estado
 
 Antes de permitir cambios de usuarios o contraseñas, definir cómo conciliarlos con `public.usuarios_imi`. Al volver a la app antigua, las contraseñas que se cambien solo en identidad no pueden reconstruirse desde sus hashes. No borrar la tabla anterior hasta que termine la observación y la reversión esté acordada.
 
-1. Confirmar en producción el ingreso al tablero con `mzalazar` y con una cuenta no administradora usando las credenciales centrales; no enviar contraseñas por chat.
-2. Observar errores de login y operaciones habituales del tablero.
-3. Mantener los cambios de identidad congelados en Activos mientras se concilia esta etapa. Salud queda fuera de este corte; Copa y otros tableros requieren su propio inventario y transición.
+1. Mantener una ventana de observación con la identidad congelada y revisar errores y operaciones habituales.
+2. Antes de retirar `public.usuarios_imi`, remover sus definiciones heredadas del código y coordinar la revisión con el propietario de la tabla; no se encontraron claves foráneas, vistas ni triggers dependientes, pero el rol propietario es de privilegio elevado.
+3. Tras la observación, respaldar y retirar la tabla mediante una migración controlada. Salud queda fuera de este corte; Copa y otros tableros requieren su propio inventario y transición.
