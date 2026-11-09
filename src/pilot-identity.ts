@@ -38,7 +38,7 @@ export async function pilotFindAccess(id:number) {
 export async function pilotLogin(username:string,password:string) {
  if(offline) throw new Error('identity offline');
  return client.transaction(async(tx:any)=>{
-  const {rows:[u]}=await tx.query(`SELECT u.id::int AS "idUsuario",u.usuario AS username,u.version_sesion AS "versionSesion",u.es_admin_global AS "esAdminGlobal",r.codigo AS "tableroAcceso",c.password_hash,c.algoritmo FROM identidad.usuarios u JOIN identidad.credenciales c ON c.usuario_id=u.id JOIN identidad.accesos a ON a.usuario_id=u.id JOIN identidad.tableros t ON t.id=a.tablero_id JOIN identidad.rangos r ON r.id=a.rango_id AND r.tablero_id=t.id WHERE (lower(btrim(u.usuario))=lower(btrim($1)) OR EXISTS (SELECT 1 FROM identidad.equivalencias_activos eq WHERE eq.usuario_id=u.id AND eq.usuario_origen_normalizado=lower(btrim($1)))) AND u.activo AND a.activo AND t.activo AND t.codigo='activos' FOR UPDATE OF c`,[username]);
+  const {rows:[u]}=await tx.query(`SELECT u.id::int AS "idUsuario",u.usuario AS username,u.version_sesion AS "versionSesion",u.es_admin_global AS "esAdminGlobal",r.codigo AS "tableroAcceso",c.password_hash,c.algoritmo FROM identidad.usuarios u JOIN identidad.credenciales c ON c.usuario_id=u.id JOIN identidad.accesos a ON a.usuario_id=u.id JOIN identidad.tableros t ON t.id=a.tablero_id JOIN identidad.rangos r ON r.id=a.rango_id AND r.tablero_id=t.id WHERE lower(btrim(u.usuario))=lower(btrim($1)) AND u.activo AND a.activo AND t.activo AND t.codigo='activos' FOR UPDATE OF c`,[username]);
   if(!u) return null;
   if(!(await verifyCredential(password,u.password_hash,u.algoritmo)))return null;
   if(u.algoritmo!==NEW_ALGORITHM)await upgradeCredential(tx,u.idUsuario,password);

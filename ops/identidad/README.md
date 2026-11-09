@@ -2,7 +2,7 @@
 
 ## Estado del corte — 9 de noviembre de 2026
 
-El primer corte supervisado quedó confirmado con el commit `4db9cc0`. Se conservó el formulario y la URL de ingreso de Activos; la validación de usuario y contraseña ahora consulta `imi_identidad`. Los ocho accesos centrales coinciden con el origen: dos administradores y seis editores. Se admite también el alias anterior `admin_mzalazar` de la identidad central `mzalazar`.
+El primer corte supervisado quedó confirmado con el commit `4db9cc0`. Se conservó el formulario y la URL de ingreso de Activos; la validación de usuario y contraseña ahora consulta `imi_identidad`. Los ocho accesos centrales coinciden con el origen: dos administradores y seis editores. El nombre anterior `admin_mzalazar` es solo una equivalencia histórica de la identidad central `mzalazar`, no una segunda cuenta; tras la confirmación del titular, dejó de aceptarse como nombre de ingreso. Se conserva la equivalencia en la base para conciliación y la fila antigua para reversión.
 
 La tabla `public.usuarios_imi` de `imi_activos_digitales` sigue intacta para contingencia. No se borró la tabla ni se consolidaron las bases de negocio. La migración de este corte solo cambia la fuente de autenticación del tablero.
 
@@ -20,7 +20,7 @@ El servidor lee `.env.integrado.local` desde el directorio de la aplicación. De
 
 `VITE_BASE_PATH=/imi-activos/` se conserva en la compilación. La clave de sesión debe ser aleatoria, estable y tener al menos 48 caracteres. El archivo de configuración debe permanecer restringido al usuario de servicio y tener respaldo protegido.
 
-El rol de datos del tablero no tiene acceso a la tabla anterior de usuarios. El rol de identidad no puede cambiar `es_admin_global`, emitir invitaciones iniciales ni borrar auditoría. El acceso de lectura a `identidad.equivalencias_activos` permite resolver los nombres de usuario anteriores; no habilita cambios de usuarios.
+El rol de datos del tablero no tiene acceso a la tabla anterior de usuarios. El rol de identidad no puede cambiar `es_admin_global`, emitir invitaciones iniciales ni borrar auditoría. La app ya no requiere acceso a `identidad.equivalencias_activos` para autenticar; el mapeo se conserva para conciliación.
 
 ## Reversión y siguientes pasos
 
