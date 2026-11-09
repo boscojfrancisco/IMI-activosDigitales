@@ -86,15 +86,6 @@ export const historyRelations = relations(indicadoresHistory, ({ one }) => ({
   }),
 }));
 
-export const usuarios = pgTable('usuarios_imi', {
-  idUsuario: serial('id_usuario').primaryKey(),
-  username: varchar('username', { length: 50 }).notNull().unique(),
-  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
-  tableroAcceso: varchar('tablero_acceso', { length: 100 }).default('reader').notNull(), // 'admin' | 'editor' | 'reader'
-  activo: boolean('activo').default(true).notNull(),
-  fechaCreacion: timestamp('fecha_creacion', { withTimezone: true }).defaultNow(),
-});
-
 // El índice nuevo conserva cada evaluación y los cortes cerrados como snapshots.
 export const digitalObservaciones = pgTable('digital_observaciones', {
   id: serial('id').primaryKey(),

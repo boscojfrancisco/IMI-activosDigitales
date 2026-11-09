@@ -3,21 +3,7 @@ import { sql } from 'drizzle-orm';
 
 async function migrate() {
   try {
-    // 1. Crear tabla de usuarios_imi si no existe
-    console.log('Creating table usuarios_imi if not exists...');
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS usuarios_imi (
-        id_usuario SERIAL PRIMARY KEY,
-        username VARCHAR(50) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        tablero_acceso VARCHAR(100) DEFAULT 'reader' NOT NULL,
-        activo BOOLEAN DEFAULT true NOT NULL,
-        fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    console.log('Table usuarios_imi checked/created');
-
-    // 2. Columnas adicionales para organismos
+    // Columnas adicionales para organismos. La autenticación vive en imi_identidad.
     const columns = [
       'q_tramites_online INTEGER DEFAULT 0',
       'iniciar_tram_online TEXT DEFAULT "No"',
