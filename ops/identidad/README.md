@@ -2,9 +2,9 @@
 
 ## Estado del corte — 9 de noviembre de 2026
 
-El primer corte supervisado quedó confirmado con el commit `4db9cc0`. Se conservó el formulario y la URL de ingreso de Activos; la validación de usuario y contraseña ahora consulta `imi_identidad`. Los ocho accesos centrales coinciden con el origen: dos administradores y seis editores. La equivalencia histórica `admin_mzalazar` → `mzalazar` dejó de aceptarse como nombre de ingreso en el commit `18155b4`, confirmado en producción el 9 de noviembre de 2026. No hay una identidad central separada llamada `admin_mzalazar`; se conserva la equivalencia y la fila antigua en la base de origen para conciliación y reversión.
+El primer corte supervisado quedó confirmado con el commit `4db9cc0`. Se conservó el formulario y la URL de ingreso de Activos; la validación de usuario y contraseña ahora consulta `imi_identidad`. Los ocho accesos centrales coinciden con el origen: dos administradores y seis editores. La equivalencia histórica `admin_mzalazar` → `mzalazar` dejó de aceptarse como nombre de ingreso en el commit `18155b4`, confirmado en producción el 9 de noviembre de 2026. No hay una identidad central separada llamada `admin_mzalazar`; la cuenta antigua en la base de origen quedó inactiva y la equivalencia se conserva para conciliación y reversión.
 
-La tabla `public.usuarios_imi` de `imi_activos_digitales` sigue intacta para contingencia. No se borró la tabla ni se consolidaron las bases de negocio. La migración de este corte solo cambia la fuente de autenticación del tablero.
+La tabla `public.usuarios_imi` de `imi_activos_digitales` se conserva para contingencia; la fila antigua `admin_mzalazar` quedó inactiva el 9 de noviembre de 2026. No se borró la tabla ni se consolidaron las bases de negocio. La migración de este corte solo cambia la fuente de autenticación del tablero.
 
 La app quedó con `IMI_SOLO_LECTURA=no` para habilitar operaciones del tablero y `IMI_CONGELAR_IDENTIDAD=si` para pausar altas, cambios de contraseña y permisos desde esta integración durante la observación. La congelación no impide cambios hechos desde otros servicios o herramientas; coordinarlos mientras se define la reversión de credenciales.
 
