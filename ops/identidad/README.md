@@ -2,7 +2,7 @@
 
 ## Estado del corte — 9 de noviembre de 2026
 
-El primer corte supervisado quedó confirmado con el commit `4db9cc0`. Se conservó el formulario y la URL de ingreso de Activos; la validación de usuario y contraseña ahora consulta `imi_identidad`. Los ocho accesos centrales coinciden con el origen: dos administradores y seis editores. El nombre anterior `admin_mzalazar` es solo una equivalencia histórica de la identidad central `mzalazar`, no una segunda cuenta; tras la confirmación del titular, dejó de aceptarse como nombre de ingreso. Se conserva la equivalencia en la base para conciliación y la fila antigua para reversión.
+El primer corte supervisado quedó confirmado con el commit `4db9cc0`. Se conservó el formulario y la URL de ingreso de Activos; la validación de usuario y contraseña ahora consulta `imi_identidad`. Los ocho accesos centrales coinciden con el origen: dos administradores y seis editores. La equivalencia histórica `admin_mzalazar` → `mzalazar` dejó de aceptarse como nombre de ingreso en el commit `18155b4`, confirmado en producción el 9 de noviembre de 2026. No hay una identidad central separada llamada `admin_mzalazar`; se conserva la equivalencia y la fila antigua en la base de origen para conciliación y reversión.
 
 La tabla `public.usuarios_imi` de `imi_activos_digitales` sigue intacta para contingencia. No se borró la tabla ni se consolidaron las bases de negocio. La migración de este corte solo cambia la fuente de autenticación del tablero.
 
@@ -12,7 +12,7 @@ El endpoint de salud respondió `{"servicio":"imi-activos-identidad","estado":"o
 
 Respaldos del corte, restaurados en bases temporales aisladas y verificados: `/var/backups/imi/identidad/imi_activos_digitales_revision_corte_20261109T143350Z.dump` y `/var/backups/imi/identidad/imi_identidad_revision_corte_20261109T143350Z.dump`. La restauración recuperó ocho usuarios, dos rangos de administrador y seis de editor, ocho migraciones y ocho accesos activos; las bases temporales se eliminaron al terminar. La copia de la aplicación anterior, dependencias y configuración está en `/home/ubuntu/.imi-activos-pre-corte-20261109`.
 
-Se retiró el rol operativo y el archivo temporal de credenciales usados para el bloqueo. La app mantiene solo lectura del mapeo de alias requerido por el login. La clave HMAC de verificación permanece protegida en el servidor para conciliaciones futuras.
+Se retiró el rol operativo y el archivo temporal de credenciales usados para el bloqueo. El rol de la app ya no puede leer `identidad.equivalencias_activos`; se verificó que el permiso quedó revocado, que `mzalazar` sigue activo como administrador global y que la equivalencia histórica se conserva. La clave HMAC de verificación permanece protegida en el servidor para conciliaciones futuras.
 
 ## Configuración
 
