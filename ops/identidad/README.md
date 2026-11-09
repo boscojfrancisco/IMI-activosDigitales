@@ -16,7 +16,7 @@ Respaldos del corte, restaurados en bases temporales aisladas y verificados: `/v
 
 Se retiró el rol operativo y el archivo temporal de credenciales usados para el bloqueo. El rol de la app ya no puede leer `identidad.equivalencias_activos`; se verificó que el permiso quedó revocado y que `mzalazar` sigue activo como administrador global. La clave HMAC de verificación permanece protegida en el servidor para conciliaciones futuras.
 
-Las sesiones de Activos usan JWT de una hora validados contra `imi_identidad`. El retiro de `usuarios_imi` no cambia la autenticación ni el secreto de sesión; el secreto permaneció igual durante el despliegue. No hay renovación automática: al vencer el token se debe iniciar sesión nuevamente.
+Las sesiones de Activos usan JWT de 12 horas validados contra `imi_identidad`. Los permisos y la versión de sesión se siguen comprobando en la base central en cada petición autenticada. No hay renovación automática: al vencer el token se debe iniciar sesión nuevamente.
 
 ## Configuración
 

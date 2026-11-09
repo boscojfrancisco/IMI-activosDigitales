@@ -55,7 +55,7 @@ app.post('/api/auth/login', pilotRateLimit, async (req, res) => {
   try {
     const user = await pilotLogin(username, password);
     if (!user) return res.status(401).json({error:'Credenciales o acceso inválidos'});
-    const token = jwt.sign({ idUsuario:user.idUsuario, versionSesion:user.versionSesion }, JWT_SECRET, { expiresIn:'1h', algorithm:'HS256', audience:'activos-piloto' });
+    const token = jwt.sign({ idUsuario:user.idUsuario, versionSesion:user.versionSesion }, JWT_SECRET, { expiresIn:'12h', algorithm:'HS256', audience:'activos-piloto' });
     return res.json({token,user});
   } catch { return res.status(503).json({error:'Identidad no disponible'}); }
 });
@@ -75,7 +75,7 @@ async function globalAuth(req:AuthRequest,res:express.Response,next:express.Next
   try{const user=await pilotFindGlobal(value.idUsuario);if(!user||user.versionSesion!==value.versionSesion)return res.status(403).json({error:'Acceso inactivo'});req.user=user;next();}catch{return res.status(503).json({error:'Identidad no disponible'});}
  }catch{return res.status(401).json({error:'Sesión inválida'});}
 }
-app.post('/api/central/login',pilotRateLimit,async(req,res)=>{try{const {username,password}=req.body||{};if(typeof username!=='string'||username.length>100||typeof password!=='string'||password.length>256)return res.status(400).json({error:'Credenciales requeridas'});const user=await pilotGlobalLogin(username,password);if(!user)return res.status(401).json({error:'Credenciales inválidas'});const token=jwt.sign({idUsuario:user.idUsuario,versionSesion:user.versionSesion},JWT_SECRET,{algorithm:'HS256',audience:'central-piloto',expiresIn:'1h'});return res.json({token,user});}catch{return res.status(503).json({error:'Identidad no disponible'});}});
+app.post('/api/central/login',pilotRateLimit,async(req,res)=>{try{const {username,password}=req.body||{};if(typeof username!=='string'||username.length>100||typeof password!=='string'||password.length>256)return res.status(400).json({error:'Credenciales requeridas'});const user=await pilotGlobalLogin(username,password);if(!user)return res.status(401).json({error:'Credenciales inválidas'});const token=jwt.sign({idUsuario:user.idUsuario,versionSesion:user.versionSesion},JWT_SECRET,{algorithm:'HS256',audience:'central-piloto',expiresIn:'12h'});return res.json({token,user});}catch{return res.status(503).json({error:'Identidad no disponible'});}});
 // Registro de reemplazo de MFA: sesión central + contraseña y segundo factor vigente.
 app.post('/api/central/password',pilotRateLimit,globalAuth,async(req:AuthRequest,res)=>{try{const x=await pilotChangePassword(req.user!.idUsuario,req.body?.actual,req.body?.nueva);res.status(x.status).json(x)}catch{res.status(503).json({error:'Identidad no disponible'})}});
 app.get('/api/central/users',globalAuth,async(_req,res)=>{try{res.json(await pilotListUsers(true))}catch{res.status(503).json({error:'Identidad no disponible'})}});
