@@ -5,11 +5,12 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
 import { db, client as businessClient, identityClient } from './src/db/index.ts';
-import { organismos, indicadoresHistory, digitalObservaciones, digitalCortes, digitalTramites, digitalVisitas, digitalMigrations, digitalVerificaciones } from './src/db/schema.ts';
+import { organismos, indicadoresHistory, digitalObservaciones, digitalCortes, digitalTramites, digitalVisitas, digitalMigrations, digitalVerificaciones, digitalVariableEstados, digitalVariableEstadoHistorial } from './src/db/schema.ts';
 import { eq, desc, sql } from 'drizzle-orm';
 import { requireAuth, checkRole, requireGlobalAdmin, AuthRequest } from './src/middleware/auth.ts';
 import { pilotLogin, initializePilot, pilotCreateUser, pilotUpdateProfile, pilotSetAccess, pilotListUsers, pilotChangePassword, pilotIssueRecovery, pilotConsumeRecovery, pilotFindGlobal, pilotGlobalLogin, pilotPersistentLimit, pilotBootstrapStart } from './src/pilot-identity.ts';
 import catalog from './src/data/digital-index-catalog.json' assert { type: 'json' };
+import { isNewerObservation, scoreLevels, type VariableStatus } from './src/lib/digital-score.ts';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -31,7 +32,7 @@ if(process.env.IMI_CONGELAR_IDENTIDAD==='si') app.use('/api',(req,res,next)=>{
  return next();
 });
 app.get('/api/health',async(_req,res)=>{
- try{await Promise.all([identityClient.query('SELECT 1 FROM identidad.tableros LIMIT 1'),businessClient.query('SELECT 1 FROM public.organismos LIMIT 1')]);return res.json({servicio:'imi-activos-identidad',estado:'ok'})}
+ try{const [,,statuses]=await Promise.all([identityClient.query('SELECT 1 FROM identidad.tableros LIMIT 1'),businessClient.query('SELECT 1 FROM public.organismos LIMIT 1'),businessClient.query('SELECT COUNT(*)::int AS count FROM public.digital_variable_estados')]);if(statuses.rows[0]?.count!==catalog.length)throw new Error('Estados de variables incompletos');return res.json({servicio:'imi-activos-identidad',estado:'ok'})}
  catch{return res.status(503).json({servicio:'imi-activos-identidad',estado:'no-disponible'})}
 });
 
@@ -106,6 +107,50 @@ app.get('/api/organismos', async (req, res) => {
 
 // Índice de madurez digital provincial (observaciones append-only y cortes inmutables).
 app.get('/api/digital-index/catalog', (_req, res) => res.json(catalog));
+
+app.get('/api/digital-index/variable-status', async (_req, res) => {
+  try {
+    res.json(await db.select().from(digitalVariableEstados));
+  } catch {
+    res.status(500).json({ error: 'No se pudo cargar el estado de las variables.' });
+  }
+});
+
+app.get('/api/digital-index/variable-status/history', requireAuth, checkRole(['admin']), async (_req, res) => {
+  try {
+    res.json(await db.select().from(digitalVariableEstadoHistorial).orderBy(desc(digitalVariableEstadoHistorial.changedAt), desc(digitalVariableEstadoHistorial.id)));
+  } catch {
+    res.status(500).json({ error: 'No se pudo cargar el historial de estados.' });
+  }
+});
+
+app.patch('/api/digital-index/variable-status/:id', requireAuth, checkRole(['admin']), async (req: AuthRequest, res) => {
+  const variableId = String(req.params.id || '').toUpperCase();
+  const estado = req.body?.estado as VariableStatus;
+  if (!catalog.some(variable => variable.id === variableId) || !['activa', 'en_relevamiento'].includes(estado)) {
+    return res.status(400).json({ error: 'Variable o estado inválido.' });
+  }
+  try {
+    const result = await db.transaction(async tx => {
+      const currentRows = await tx.select().from(digitalVariableEstados).for('update');
+      const previous = currentRows.find(row => row.variableId === variableId);
+      if (!previous) return null;
+      if (previous.estado === estado) return previous;
+      if (previous.estado === 'activa' && estado === 'en_relevamiento' && currentRows.filter(row => row.estado === 'activa').length <= 1) {
+        throw new Error('Debe quedar al menos una variable activa.');
+      }
+      const usuario = req.user?.username || 'Usuario';
+      const [updated] = await tx.update(digitalVariableEstados).set({ estado, updatedBy: usuario, updatedAt: new Date() }).where(eq(digitalVariableEstados.variableId, variableId)).returning();
+      await tx.insert(digitalVariableEstadoHistorial).values({ variableId, estadoAnterior: previous.estado, estadoNuevo: estado, usuario });
+      return updated;
+    });
+    if (!result) return res.status(404).json({ error: 'Estado de variable no inicializado.' });
+    res.json(result);
+  } catch (error:any) {
+    if(error.message === 'Debe quedar al menos una variable activa.') return res.status(409).json({error:error.message});
+    res.status(500).json({ error: 'No se pudo actualizar el estado.' });
+  }
+});
 
 const LEGACY_BASELINE_CODE = 'monitor-anterior-2026-01';
 const LEGACY_COMPLETE_CODE = 'monitor-anterior-completo-2026-02';
@@ -468,27 +513,29 @@ app.post('/api/digital-index/cuts', requireAuth, checkRole(['admin', 'editor']),
     if (existingCuts.some(cut => cut.nombre.toLowerCase() === nombre.trim().toLowerCase())) {
       return res.status(409).json({ error: 'Ya existe un corte con ese nombre.' });
     }
-    const [allOrgs, allObservations] = await Promise.all([
-      db.select().from(organismos),
-      db.select().from(digitalObservaciones)
-    ]);
-    const variables = catalog as Array<{id:string;points:number;dimension:string;scale:string}>;
-    const snapshot = allOrgs.map(org => {
-      const latest: Record<string, typeof allObservations[number]> = {};
-      for (const observation of allObservations.filter(item => item.organismoId === org.id && item.fechaObservacion <= fecha)) {
-        const previous = latest[observation.variableId];
-        if (!previous || observation.fechaObservacion > previous.fechaObservacion ||
-          (observation.fechaObservacion === previous.fechaObservacion && observation.fuente === 'V' && previous.fuente !== 'V') ||
-          (observation.fechaObservacion === previous.fechaObservacion && observation.fuente === previous.fuente && observation.id > previous.id)) {
-          latest[observation.variableId] = observation;
+    const [cut] = await db.transaction(async tx => {
+      const [allOrgs, allObservations, statusRows] = await Promise.all([
+        tx.select().from(organismos),
+        tx.select().from(digitalObservaciones),
+        tx.select().from(digitalVariableEstados)
+      ]);
+      const variables = catalog as Array<{id:string;points:number;dimension:string;scale:string}>;
+      const statuses = Object.fromEntries(statusRows.map(row => [row.variableId, row.estado])) as Record<string, VariableStatus>;
+      if (variables.some(variable => !statuses[variable.id])) throw new Error('Faltan estados de variables');
+      const variablesActivas = variables.filter(variable => statuses[variable.id] === 'activa').map(variable => variable.id);
+      const maximoActivo = variables.filter(variable => statuses[variable.id] === 'activa').reduce((sum, variable) => sum + variable.points, 0);
+      const snapshot = allOrgs.map(org => {
+        const latest: Record<string, typeof allObservations[number]> = {};
+        for (const observation of allObservations.filter(item => item.organismoId === org.id && item.fechaObservacion <= fecha)) {
+          const previous = latest[observation.variableId];
+          if (isNewerObservation(observation, previous)) latest[observation.variableId] = observation;
         }
-      }
-      const levels = Object.fromEntries(variables.map(variable => [variable.id, latest[variable.id]?.nivel ?? 0]));
-      const dimensionA = variables.filter(v => v.dimension === 'A').reduce((sum, v) => sum + v.points * Number(levels[v.id]) / 3, 0);
-      const dimensionB = variables.filter(v => v.dimension === 'B').reduce((sum, v) => sum + v.points * Number(levels[v.id]) / 3, 0);
-      return { organismoId: org.id, nombre: org.nombre, niveles: levels, dimensionA, dimensionB, total: dimensionA + dimensionB };
-    });
-    const [cut] = await db.insert(digitalCortes).values({ fecha, nombre: nombre.trim(), snapshot, cerradoPor: req.user?.username || 'Usuario' }).returning();
+        const levels = Object.fromEntries(variables.map(variable => [variable.id, latest[variable.id]?.nivel ?? 0]));
+        const { dimensionA, dimensionB, total } = scoreLevels(levels, variables, statuses);
+        return { organismoId: org.id, nombre: org.nombre, niveles: levels, dimensionA, dimensionB, total };
+      });
+      return tx.insert(digitalCortes).values({ fecha, nombre: nombre.trim(), snapshot, variablesActivas, maximoActivo, cerradoPor: req.user?.username || 'Usuario' }).returning();
+    }, { isolationLevel: 'repeatable read' });
     res.status(201).json(cut);
   } catch (error: any) {
     res.status(500).json({ error: 'No se pudo cerrar el corte.' });

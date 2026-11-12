@@ -105,8 +105,26 @@ export const digitalCortes = pgTable('digital_cortes', {
   fecha: varchar('fecha', { length: 10 }).notNull(),
   nombre: varchar('nombre', { length: 40 }).notNull(),
   snapshot: jsonb('snapshot').$type<Array<{ organismoId:number; nombre:string; niveles:Record<string,number>; dimensionA:number; dimensionB:number; total:number }>>().notNull(),
+  variablesActivas: jsonb('variables_activas').$type<string[]>().notNull(),
+  maximoActivo: integer('maximo_activo').notNull(),
   cerradoPor: text('cerrado_por').notNull(),
   cerradoAt: timestamp('cerrado_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const digitalVariableEstados = pgTable('digital_variable_estados', {
+  variableId: varchar('variable_id', { length: 2 }).primaryKey(),
+  estado: varchar('estado', { length: 20 }).$type<'activa' | 'en_relevamiento'>().notNull(),
+  updatedBy: text('updated_by').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const digitalVariableEstadoHistorial = pgTable('digital_variable_estado_historial', {
+  id: serial('id').primaryKey(),
+  variableId: varchar('variable_id', { length: 2 }).notNull(),
+  estadoAnterior: varchar('estado_anterior', { length: 20 }).notNull(),
+  estadoNuevo: varchar('estado_nuevo', { length: 20 }).notNull(),
+  usuario: text('usuario').notNull(),
+  changedAt: timestamp('changed_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const digitalTramites = pgTable('digital_detalle_tramites', {
